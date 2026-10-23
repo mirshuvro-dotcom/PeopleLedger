@@ -1,0 +1,1408 @@
+{
+  "contractVersion": 1,
+  "classifications": {
+    "public": "Visible to anyone in the tenant with access to the record type (e.g. directory names).",
+    "employee": "Visible to the employee concerned and to roles granted the record type.",
+    "hr-restricted": "HR, security and explicitly granted roles only.",
+    "payroll-restricted": "Payroll/finance roles only.",
+    "medical": "Authorized health handlers only."
+  },
+  "retentionClasses": {
+    "tenant-account": "Life of the customer contract plus the offboarding retention period (SAS-03, SAS-04). Period: not yet decided.",
+    "identity-access": "Access records kept for security review after revocation. Period: not yet decided.",
+    "employment-record": "Personnel history retained after employment ends per the legal pack and tenant policy (NFR-05, DOC-17). Period: comes from an approved pack, none exists yet.",
+    "audit-trail": "Per audit category within legal minimums, with legal hold (AUD-07). Period: not yet decided.",
+    "operational-transient": "Delivery/processing bookkeeping; purge after completion window. Period: not yet decided.",
+    "product-catalogue": "Product-versioned reference data; kept while referenced.",
+    "schema-metadata": "Kept for the life of the database."
+  },
+  "entities": [
+    {
+      "table": "tenant",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Customer tenant: the root of every isolation boundary.",
+      "retentionClass": "tenant-account",
+      "apiResource": "/v1/tenant (planned, read-only for tenant users)",
+      "writePath": "provision_tenant() via the platform role only.",
+      "migration": "Created in 0001_foundation (expand).",
+      "constraints": [
+        "PK (id)",
+        "name 1-200 chars",
+        "environment in (production, sandbox)",
+        "status in (active, suspended)",
+        "version >= 1, must advance by exactly 1 per update",
+        "insert/update requires an audit event in the same transaction"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque tenant identifier."
+        },
+        "name": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "name",
+          "description": "Customer display name."
+        },
+        "environment": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "environment",
+          "description": "production or sandbox (PLT-03)."
+        },
+        "status": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "status",
+          "description": "active or suspended."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": "createdAt",
+          "description": "DB clock at creation."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Platform actor reference."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version."
+        }
+      }
+    },
+    {
+      "table": "legal_entity",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Legal employer inside a tenant (ORG-01). Statutory registrations (ORG-02) are later work.",
+      "retentionClass": "tenant-account",
+      "apiResource": "/v1/legal-entities (planned)",
+      "writePath": "platform repository createLegalEntity / renameLegalEntity.",
+      "migration": "Created in 0002_identity_org (expand).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "FK tenant_id -> tenant",
+        "legal_name_en 1-300 chars",
+        "production_payroll_enabled must be false (ORG-08)",
+        "optimistic version",
+        "audit required"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant; defaults to the transaction's tenant context."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "legal_name_en": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "legalName.en",
+          "description": "Registered name in English."
+        },
+        "legal_name_bn": {
+          "type": "text",
+          "nullable": true,
+          "classification": "public",
+          "api": "legalName.bn",
+          "description": "Registered name in Bangla."
+        },
+        "status": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "status",
+          "description": "active or inactive."
+        },
+        "production_payroll_enabled": {
+          "type": "boolean",
+          "nullable": false,
+          "classification": "public",
+          "api": "productionPayrollEnabled",
+          "description": "Always false until Section 20 conditions are met."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": "createdAt",
+          "description": "DB clock at creation."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version."
+        }
+      }
+    },
+    {
+      "table": "user_account",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Global sign-in identity (IAM-04). Visible to a tenant only through its own membership. Holds no profile data.",
+      "retentionClass": "identity-access",
+      "apiResource": "/v1/members/{id}/account (planned)",
+      "writePath": "membership_invite() creates or links by normalized email.",
+      "migration": "Created in 0002_identity_org (expand).",
+      "constraints": [
+        "PK (id)",
+        "unique email",
+        "email lower-case, trimmed, contains @, <= 320 chars",
+        "status in (active, disabled)",
+        "RLS: readable only when a membership in the current tenant references it"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "email": {
+          "type": "text",
+          "nullable": false,
+          "classification": "employee",
+          "api": "email",
+          "description": "Sign-in email (normalized)."
+        },
+        "status": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "status",
+          "description": "active or disabled."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "DB clock at creation."
+        }
+      }
+    },
+    {
+      "table": "membership",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "A user's access to one tenant. State contract: docs/architecture/workflows/membership.md.",
+      "retentionClass": "identity-access",
+      "apiResource": "/v1/members (planned)",
+      "writePath": "membership_invite(); status changes via changeMembershipStatus.",
+      "migration": "Created in 0002_identity_org (expand).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "unique (tenant_id, user_id)",
+        "FK user_id -> user_account",
+        "status transitions enforced by trigger",
+        "no self status change except accepting an invitation",
+        "optimistic version",
+        "audit required"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "userId",
+          "description": "Linked global account."
+        },
+        "status": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "status",
+          "description": "invited, active, suspended or revoked."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "createdAt",
+          "description": "DB clock at invitation."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Inviting actor."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version."
+        }
+      }
+    },
+    {
+      "table": "permission",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "reference",
+      "description": "Product-versioned resource:action catalogue (RBAC-02). Read-only at runtime; changed only by migration.",
+      "retentionClass": "product-catalogue",
+      "apiResource": "/v1/permissions (planned, read-only)",
+      "writePath": "Migrations only.",
+      "migration": "Created and seeded in 0002_identity_org (expand). New permissions are added by later expand migrations; removal needs a contract migration after no role references them.",
+      "constraints": [
+        "PK (code)",
+        "code = resource || ':' || action",
+        "action from the RBAC-02 list",
+        "owner_module in the five modules",
+        "sensitivity in (standard, sensitive, critical)"
+      ],
+      "columns": {
+        "code": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "code",
+          "description": "resource:action."
+        },
+        "resource": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "resource",
+          "description": "Resource name."
+        },
+        "action": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "action",
+          "description": "Action name."
+        },
+        "description": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "description",
+          "description": "Human description."
+        },
+        "owner_module": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "ownerModule",
+          "description": "Module that owns the resource."
+        },
+        "sensitivity": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "sensitivity",
+          "description": "Proposed sensitivity level (see open questions)."
+        },
+        "catalogue_version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "catalogueVersion",
+          "description": "Catalogue version that introduced the permission."
+        }
+      }
+    },
+    {
+      "table": "role",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Tenant role: a named set of permissions. System role templates (RBAC-01) are not seeded yet.",
+      "retentionClass": "identity-access",
+      "apiResource": "/v1/roles (planned)",
+      "writePath": "platform repository createRole.",
+      "migration": "Created in 0002_identity_org (expand).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "unique (tenant_id, lower(name))",
+        "parent_role_id FK within the same tenant, not self",
+        "is_system cannot be set by runtime roles",
+        "optimistic version",
+        "audit required"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "name": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "name",
+          "description": "Role name, unique per tenant (case-insensitive)."
+        },
+        "description": {
+          "type": "text",
+          "nullable": true,
+          "classification": "public",
+          "api": "description",
+          "description": "Purpose of the role."
+        },
+        "is_system": {
+          "type": "boolean",
+          "nullable": false,
+          "classification": "public",
+          "api": "isSystem",
+          "description": "Product-provided role; immutable except tenant scoping."
+        },
+        "parent_role_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "public",
+          "api": "parentRoleId",
+          "description": "Role this one was cloned from."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": "createdAt",
+          "description": "DB clock at creation."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version."
+        }
+      }
+    },
+    {
+      "table": "role_permission",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "association",
+      "description": "Permission granted to a tenant role.",
+      "retentionClass": "identity-access",
+      "apiResource": "/v1/roles/{id}/permissions (planned)",
+      "writePath": "platform repository grantPermission / revokePermission.",
+      "migration": "Created in 0002_identity_org (expand).",
+      "constraints": [
+        "PK (tenant_id, role_id, permission_code)",
+        "FK (tenant_id, role_id) -> role",
+        "FK permission_code -> permission",
+        "insert/delete requires an audit event for the role"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "role_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "roleId",
+          "description": "Role."
+        },
+        "permission_code": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "permission",
+          "description": "Granted permission."
+        },
+        "granted_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "grantedAt",
+          "description": "DB clock at grant."
+        },
+        "granted_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        }
+      }
+    },
+    {
+      "table": "role_assignment",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "effective-dated-fact",
+      "description": "Grant of a role to a membership for a scope and a business-date interval. State contract: docs/architecture/workflows/role-assignment.md.",
+      "retentionClass": "identity-access",
+      "apiResource": "/v1/role-assignments (planned)",
+      "writePath": "platform repository assignRole / endRoleAssignment.",
+      "migration": "Created in 0002_identity_org (expand). Further RBAC-03 scope dimensions arrive as nullable columns in a later expand migration.",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "FKs to membership, role, legal_entity within the same tenant",
+        "scope_type tenant <=> scope_legal_entity_id is null",
+        "effective_to >= effective_from",
+        "no overlapping interval for the same membership, role and scope (exclusion constraint)",
+        "assignee cannot be the acting user (insert or update)",
+        "only effective_to and version are updatable",
+        "optimistic version",
+        "audit required"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "membership_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "membershipId",
+          "description": "Assignee."
+        },
+        "role_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "roleId",
+          "description": "Assigned role."
+        },
+        "scope_type": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "scope.type",
+          "description": "tenant or legal_entity."
+        },
+        "scope_legal_entity_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "scope.legalEntityId",
+          "description": "Entity for legal_entity scope."
+        },
+        "effective_from": {
+          "type": "date",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "effectiveFrom",
+          "description": "First business date in force (Asia/Dhaka)."
+        },
+        "effective_to": {
+          "type": "date",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "effectiveTo",
+          "description": "Last business date in force, inclusive; null = open."
+        },
+        "reason": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "reason",
+          "description": "Why the access was granted."
+        },
+        "recorded_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "recordedAt",
+          "description": "DB clock when recorded (identifies backdating)."
+        },
+        "recorded_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version."
+        }
+      }
+    },
+    {
+      "table": "person",
+      "owner": "people",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Person anchor (EMP-01). Attributes live in person_version; this row holds identity and the aggregate's optimistic version.",
+      "retentionClass": "employment-record",
+      "apiResource": "/v1/people (planned)",
+      "writePath": "people repository createPerson / appendPersonVersion.",
+      "migration": "Created in 0003_people (expand).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "optimistic version (bumped with every new version row)",
+        "audit required"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "createdAt",
+          "description": "DB clock at creation."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version of the aggregate."
+        }
+      }
+    },
+    {
+      "table": "person_version",
+      "owner": "people",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "version",
+      "description": "Effective-dated person attributes with recorded time (EMP-08). Append-only except closing the open version.",
+      "retentionClass": "employment-record",
+      "apiResource": "/v1/people/{id}/versions (planned)",
+      "writePath": "people repository createPerson / appendPersonVersion.",
+      "migration": "Created in 0003_people (expand). New attributes arrive as nullable columns (expand), backfilled (migrate), then made required (contract).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "FK (tenant_id, person_id) -> person",
+        "effective_to >= effective_from",
+        "no overlapping intervals per person (exclusion constraint)",
+        "only an open version may be closed; closed history is immutable",
+        "birth_date >= 1900-01-01",
+        "audit required (resource = person_id)"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "versionId",
+          "description": "Version row identifier."
+        },
+        "person_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "personId",
+          "description": "Person anchor."
+        },
+        "effective_from": {
+          "type": "date",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "effectiveFrom",
+          "description": "First business date in force."
+        },
+        "effective_to": {
+          "type": "date",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "effectiveTo",
+          "description": "Last business date in force, inclusive; null = open."
+        },
+        "legal_name_en": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "legalName.en",
+          "description": "Legal name (English)."
+        },
+        "legal_name_bn": {
+          "type": "text",
+          "nullable": true,
+          "classification": "public",
+          "api": "legalName.bn",
+          "description": "Legal name (Bangla)."
+        },
+        "preferred_name": {
+          "type": "text",
+          "nullable": true,
+          "classification": "public",
+          "api": "preferredName",
+          "description": "Preferred name."
+        },
+        "birth_date": {
+          "type": "date",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "birthDate",
+          "description": "Date of birth (hidden in directory unless shared, HRP-01)."
+        },
+        "recorded_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "recordedAt",
+          "description": "DB clock when recorded."
+        },
+        "recorded_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        }
+      }
+    },
+    {
+      "table": "employment",
+      "owner": "people",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Employment of a person by a legal entity (EMP-01). Rehire is a new employment row; history is preserved.",
+      "retentionClass": "employment-record",
+      "apiResource": "/v1/employments (planned)",
+      "writePath": "people repository createEmployment.",
+      "migration": "Created in 0003_people (expand). Employment category / classification (EMP-04) is deliberately absent pending design (open questions).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "FKs to person and legal_entity within the same tenant",
+        "unique (tenant_id, legal_entity_id, employee_code)",
+        "employee_code 1-40 chars [A-Za-z0-9._/-]",
+        "end_date >= hire_date",
+        "optimistic version",
+        "audit required"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Opaque identifier."
+        },
+        "person_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "personId",
+          "description": "Employed person."
+        },
+        "legal_entity_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "legalEntityId",
+          "description": "Employing entity."
+        },
+        "employee_code": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "employeeCode",
+          "description": "Employer-assigned identifier."
+        },
+        "hire_date": {
+          "type": "date",
+          "nullable": false,
+          "classification": "employee",
+          "api": "hireDate",
+          "description": "Business date employment started."
+        },
+        "end_date": {
+          "type": "date",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "endDate",
+          "description": "Last day of employment, inclusive."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "createdAt",
+          "description": "DB clock at creation."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        },
+        "version": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": "version",
+          "description": "Optimistic concurrency version of the aggregate."
+        }
+      }
+    },
+    {
+      "table": "employment_version",
+      "owner": "people",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "version",
+      "description": "Effective-dated employment attributes with recorded time (EMP-08).",
+      "retentionClass": "employment-record",
+      "apiResource": "/v1/employments/{id}/versions (planned)",
+      "writePath": "people repository createEmployment.",
+      "migration": "Created in 0003_people (expand).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "FK (tenant_id, employment_id) -> employment",
+        "effective_to >= effective_from",
+        "no overlapping intervals per employment",
+        "only an open version may be closed",
+        "audit required (resource = employment_id)"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "versionId",
+          "description": "Version row identifier."
+        },
+        "employment_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "employmentId",
+          "description": "Employment anchor."
+        },
+        "effective_from": {
+          "type": "date",
+          "nullable": false,
+          "classification": "employee",
+          "api": "effectiveFrom",
+          "description": "First business date in force."
+        },
+        "effective_to": {
+          "type": "date",
+          "nullable": true,
+          "classification": "employee",
+          "api": "effectiveTo",
+          "description": "Last business date in force, inclusive; null = open."
+        },
+        "job_title": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": "jobTitle",
+          "description": "Job title."
+        },
+        "recorded_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "recordedAt",
+          "description": "DB clock when recorded."
+        },
+        "recorded_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Actor reference."
+        }
+      }
+    },
+    {
+      "table": "audit_event",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "append-only-log",
+      "description": "Tamper-evident audit trail (AUD-01..AUD-09). Per-tenant hash chain; append-only for every role.",
+      "retentionClass": "audit-trail",
+      "apiResource": "/v1/audit-events (planned, audit_event:view)",
+      "writePath": "writeAudit() inside the business transaction; provision_tenant().",
+      "migration": "Created in 0001_foundation (expand). Never contract: removing columns would break hash verification of existing rows; add a new hash version instead.",
+      "constraints": [
+        "PK (tenant_id, seq)",
+        "unique (tenant_id, id)",
+        "seq gapless per tenant",
+        "prev_hash = previous row hash; hash = sha256(prev_hash | canonical row)",
+        "seq, prev_hash, hash, recorded_at, txid assigned by trigger",
+        "UPDATE, DELETE and TRUNCATE rejected for every role",
+        "category, actor_type, result, source from fixed lists"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "seq": {
+          "type": "bigint",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "seq",
+          "description": "Position in the tenant chain."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "id",
+          "description": "Unique event id."
+        },
+        "occurred_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "occurredAt",
+          "description": "Event time reported by the application (AUD-09)."
+        },
+        "recorded_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "recordedAt",
+          "description": "DB clock when stored (AUD-09)."
+        },
+        "txid": {
+          "type": "bigint",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Writing transaction; links events to the change they audit."
+        },
+        "category": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "category",
+          "description": "AUD-04 category."
+        },
+        "action": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "action",
+          "description": "Dotted action name, e.g. person.created."
+        },
+        "actor_type": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "actor.type",
+          "description": "user, service-account, system-job, support-staff or platform-operator."
+        },
+        "actor_id": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "actor.id",
+          "description": "Actor reference."
+        },
+        "acting_as_user_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "actingAsUserId",
+          "description": "Delegator or impersonated user."
+        },
+        "legal_entity_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "legalEntityId",
+          "description": "Entity context where relevant."
+        },
+        "resource_type": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "resource.type",
+          "description": "Target resource type."
+        },
+        "resource_id": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "resource.id",
+          "description": "Target resource id."
+        },
+        "result": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "result",
+          "description": "success, denied or failed."
+        },
+        "reason": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "reason",
+          "description": "Reason or comment where required."
+        },
+        "source": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "source",
+          "description": "web, api, mobile, integration, job or platform."
+        },
+        "ip_address": {
+          "type": "inet",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "ipAddress",
+          "description": "Client IP."
+        },
+        "user_agent": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "userAgent",
+          "description": "Client user agent."
+        },
+        "request_id": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "requestId",
+          "description": "Request identifier."
+        },
+        "correlation_id": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "correlationId",
+          "description": "Correlation id across events (AUD-10)."
+        },
+        "before_ref": {
+          "type": "jsonb",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "before",
+          "description": "Pointer/diff of prior state; restricted fields carry markers, never values (AUD-03)."
+        },
+        "after_ref": {
+          "type": "jsonb",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "after",
+          "description": "Pointer/diff of new state; restricted fields carry markers, never values (AUD-03)."
+        },
+        "prev_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "prevHash",
+          "description": "Hash of the previous event in the tenant chain."
+        },
+        "hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "hash",
+          "description": "sha256 of prev_hash and canonical row content."
+        }
+      }
+    },
+    {
+      "table": "audit_chain_head",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": false,
+      "kind": "infrastructure",
+      "description": "Latest seq and hash per tenant chain. Not granted to runtime roles; used to serialize appends and detect a truncated tail.",
+      "retentionClass": "audit-trail",
+      "apiResource": null,
+      "writePath": "audit_event_chain() trigger only.",
+      "migration": "Created in 0001_foundation (expand).",
+      "constraints": [
+        "PK (tenant_id)",
+        "FK tenant_id -> tenant",
+        "no runtime grants"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Tenant chain."
+        },
+        "last_seq": {
+          "type": "bigint",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Highest committed seq."
+        },
+        "last_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Hash of that event."
+        }
+      }
+    },
+    {
+      "table": "outbox_event",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "infrastructure",
+      "description": "Transactional outbox (ARCH-07). State contract: docs/architecture/workflows/outbox-event.md.",
+      "retentionClass": "operational-transient",
+      "apiResource": null,
+      "writePath": "publishEvent() in the business transaction; outbox_claim() and the worker for status.",
+      "migration": "Created in 0004_outbox_idempotency (expand).",
+      "constraints": [
+        "PK (tenant_id, id)",
+        "unique (tenant_id, topic, dedupe_key)",
+        "processing <=> locked_by and locked_until set",
+        "done <=> processed_at set",
+        "transitions enforced by trigger; content immutable",
+        "re-claim only after lease expiry",
+        "status columns updatable by pl_worker only"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Event id; also the handler idempotency key."
+        },
+        "topic": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Event topic, e.g. person.created."
+        },
+        "dedupe_key": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Stable producer key; repeats are ignored."
+        },
+        "payload": {
+          "type": "jsonb",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Event payload. Convention: identifiers only, no sensitive values."
+        },
+        "correlation_id": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Correlation id of the producing request."
+        },
+        "status": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "pending, processing, done or dead."
+        },
+        "attempts": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Claims so far."
+        },
+        "available_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Earliest next claim (retry backoff)."
+        },
+        "locked_by": {
+          "type": "text",
+          "nullable": true,
+          "classification": "public",
+          "api": null,
+          "description": "Worker holding the lease."
+        },
+        "locked_until": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "public",
+          "api": null,
+          "description": "Lease expiry."
+        },
+        "last_error": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Truncated last failure message."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "DB clock at publish."
+        },
+        "processed_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "public",
+          "api": null,
+          "description": "DB clock when handled."
+        }
+      }
+    },
+    {
+      "table": "idempotency_key",
+      "owner": "platform",
+      "tenantScoped": true,
+      "runtimeAccess": true,
+      "kind": "infrastructure",
+      "description": "Record that an effect identified by (scope, key) has been applied. Inserted in the same transaction as the effect.",
+      "retentionClass": "operational-transient",
+      "apiResource": null,
+      "writePath": "runIdempotent().",
+      "migration": "Created in 0004_outbox_idempotency (expand).",
+      "constraints": [
+        "PK (tenant_id, scope, key)",
+        "insert-only for runtime roles"
+      ],
+      "columns": {
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Owning tenant."
+        },
+        "scope": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Effect family, e.g. outbox:<handler>."
+        },
+        "key": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Stable key within the scope."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "DB clock when the effect was applied."
+        }
+      }
+    },
+    {
+      "table": "schema_migrations",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": false,
+      "kind": "infrastructure",
+      "description": "Applied migrations with checksums. Managed by the migration runner.",
+      "retentionClass": "schema-metadata",
+      "apiResource": null,
+      "writePath": "migrateUp / migrateDown only.",
+      "migration": "Created by the migration runner before the first migration.",
+      "constraints": [
+        "PK (version)",
+        "phase in (expand, migrate, contract)",
+        "no runtime grants"
+      ],
+      "columns": {
+        "version": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Migration number, e.g. 0001."
+        },
+        "name": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Migration name."
+        },
+        "phase": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "expand, migrate or contract."
+        },
+        "checksum": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "sha256 of the up script."
+        },
+        "applied_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "When applied."
+        },
+        "applied_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Database role that applied it."
+        }
+      }
+    }
+  ]
+}

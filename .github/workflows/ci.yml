@@ -10,6 +10,21 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PEOPLELEDGER_DB_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PEOPLELEDGER_DB_MIGRATION_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -20,6 +35,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm test:db
+      - name: Migrations apply through the CLI on a clean database
+        run: pnpm db roles && pnpm db up && pnpm db status
       - run: pnpm demo:slice
-      - name: Traceability matrix is up to date
-        run: pnpm traceability && git diff --exit-code docs/traceability/requirements-matrix.md
+      - name: Generated docs are up to date
+        run: |
+          pnpm traceability
+          pnpm data-contracts
+          git diff --exit-code docs/traceability/requirements-matrix.md docs/data-contracts

@@ -23,12 +23,18 @@ These apply to every contributor, including AI assistants. They condense Section
   production mode whatever their labels say.
 - **Tenant boundary everywhere.** Every read by id passes through a tenant check; errors must not reveal that a
   record exists in another tenant.
+- **Database rules.** Every tenant table has `tenant_id`, RLS, composite keys/FKs and a data contract in
+  `db/contracts/entities.json`. Run tenant work through `withTenant`; never use session-level `SET`. Write an
+  audit event in the same transaction as every sensitive change (the database refuses to commit otherwise).
+  Migrations are additive (`-- phase: expand`) unless a reviewed contract migration is intended; never run them
+  from application code. A module writes only the tables its contract assigns to it.
 - **Synthetic data only.** No real names, salaries, bank, NID or TIN values in code, fixtures, logs or prompts.
 - **History is immutable.** Effective-dated changes append versions; approved/posted records are corrected by
   linked adjustments, never edits.
 
 ## Checks
 
-Run `pnpm check` before committing. Tax, payroll, tenant-boundary, approval and retry logic need meaningful tests
-(not snapshot echoes). If you change `docs/traceability/status.json`, run `pnpm traceability`.
+Run `pnpm check` before committing (needs PostgreSQL for `pnpm test:db`). Tax, payroll, tenant-boundary, approval and retry logic need meaningful tests
+(not snapshot echoes). If you change `docs/traceability/status.json`, run `pnpm traceability`; if you change
+`db/contracts/entities.json`, run `pnpm data-contracts`.
 Never mark a requirement "Passed" without acceptance evidence for its full text.

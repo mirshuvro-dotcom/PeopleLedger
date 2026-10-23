@@ -17,21 +17,32 @@ bounded feature at a time. This is the proposed order. Each step lists its requi
 - Draft bilingual payslip, lakh grouping, TEST ONLY watermark (PAY-14 subset, RPT-19).
 - Appendix B T-01 to T-05 reproduced as TEST ONLY smoke tests (not golden cases).
 
+**Slice 1: database and tenant isolation layer**
+
+- PostgreSQL migrations 0001–0004 (expand) for tenant, legal_entity, user_account, membership, permission, role,
+  role_permission, role_assignment, person(+version), employment(+version), audit_event, outbox_event,
+  idempotency_key; own migration runner and CLI (ARCH-05).
+- RLS on every runtime tenant table, transaction-local tenant context, composite tenant FKs; pooled-connection
+  and worker isolation tests (ARCH-06).
+- Append-only hash-chained audit with integrity verification; DB refuses unaudited sensitive changes (AUD-02,
+  AUD-03, AUD-08; AUD-06 partial).
+- Transactional outbox with idempotent handlers (ARCH-07); workflow state contracts (GOV-02 partial); data
+  contracts with schema drift test (GOV-03); module write ownership test (ARCH-04).
+
 ## Next bounded features
 
-1. **Persistence foundation (Phase 1).** `apps/api` + PostgreSQL migrations for Tenant, LegalEntity, Person,
-   Employment, CompensationAgreementVersion; row-level security with transactional tenant context; cross-tenant
-   tests (ARCH-05, ARCH-06, PRN-07, AC-01). Entity contracts first (GOV-03).
-2. **Audit trail core.** Append-only, hash-chained audit events; failed audit write aborts the action (AUD-01,
-   AUD-02, AUD-06, AUD-08).
-3. **Identity and permissions.** Users, memberships, `resource:action` catalogue, scoped role assignments, deny by
-   default, maker/checker constraints (SEC-01, SEC-02, RBAC-01 – RBAC-06, IAM-01).
+1. **API skeleton.** `apps/api` with request context → `withTenant`, endpoint-level `requirePermission`, and
+   catalogue-driven authorization tests per endpoint (SEC-01, RBAC-16).
+2. **Audit completion.** Per-period chains and external anchoring, read/export logging, retention per category
+   (AUD-04 – AUD-07, NFR-03).
+3. **Identity and permissions.** Sign-in and MFA, system role templates, remaining RBAC-03 scopes, field-level
+   permissions, maker/checker and delegation on top of the existing membership/role tables (IAM-01, RBAC-01 –
+   RBAC-08, SEC-02, SEC-03).
 4. **Payroll run lifecycle.** PayrollRun / RunRevision / persisted snapshots; Draft → … → Approved with optimistic
    locking and stale-revision invalidation; duplicate regular run prevention (PAY-06 – PAY-08, GOV-02).
 5. **Rule pack registry.** Persisted packs and approvals, LAW-04 transitions with actor checks, signed artifacts,
    diff view (LAW-03, LAW-04, LAW-07).
-6. **Posting and outbox.** Immutable balanced postings, transactional outbox, idempotent handlers (PAY-11, ARCH-07,
-   AC-10, AC-19).
+6. **Posting.** Immutable balanced postings published through the existing outbox (PAY-11, AC-10, AC-19).
 7. **Calendars** (CAL-01 – CAL-03, CAL-13 – CAL-16) and then the Time module (ATT, LEV).
 
 Production payroll stays disabled throughout (`LegalEntity.productionPayrollEnabled: false`) until Section 20

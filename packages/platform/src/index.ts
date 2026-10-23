@@ -41,3 +41,5 @@ export function assertTenant<T extends TenantScoped>(context: TenantId, record: 
   }
   return record;
 }
+
+export * from "./db/index.js";

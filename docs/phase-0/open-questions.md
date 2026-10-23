@@ -31,3 +31,26 @@ until answered.
   including the current period. The exact statutory method under Section 86 and the TDS Rules 2026 is unverified.
 - Bangla labels on the payslip (e.g. "উৎসে কর কর্তন", "নিট প্রদেয়") need review by a native-speaking payroll
   professional before any customer sees them.
+
+## Raised by the database and tenancy layer (decisions needed, defaults used are reversible)
+
+1. **Field classification defaults.** The five classes (public, employee, hr-restricted, payroll-restricted,
+   medical) have no class for security/system metadata (audit rows, IP addresses, actor ids). Proposed default
+   used: `hr-restricted`. Also proposed: sign-in email `employee`, birth date `hr-restricted`, legal names
+   `public`. Confirm, or add a `security` class (DOC-02 lists more classes than the five used here).
+2. **Retention periods.** Retention classes exist (`db/contracts/entities.json`) but no periods. NFR-05/DOC-17 say
+   periods come from the legal pack and tenant policy; none exists. Nothing is deleted automatically meanwhile.
+3. **Employment category (EMP-04).** Not stored yet. Should categories be a fixed product list, a tenant reference
+   table, or a reviewed `ClassificationDetermination` (Section 14.2)? Left out rather than guessed.
+4. **Default system roles (RBAC-01).** Which permissions each Section 3 role gets is a product decision; no system
+   roles are seeded. Permission sensitivity levels in the seeded catalogue are proposals.
+5. **Re-inviting a revoked member.** `revoked` is terminal and (tenant, user) is unique, so re-inviting the same
+   person needs either reactivation or a new membership row. Which?
+6. **Tenant-visible account data.** `user_account` holds only email and status so linking an existing account
+   discloses nothing (EMP-10). Confirm profile data stays tenant-scoped.
+7. **Platform support access.** The platform role currently has no path to tenant data at all. RBAC-13 consented
+   support access needs a design (time-boxed grant row + RLS policy, or a separate audited function).
+8. **Audit anchoring target.** AUD-06 requires anchoring the chain in a separate write-protected store (e.g. object
+   storage with object lock, or an external timestamping service). Depends on the hosting decision.
+9. **Field encryption scope.** Which fields need application-level encryption (NFR-01) and which KMS. Depends on
+   hosting; no such fields exist in this layer yet.

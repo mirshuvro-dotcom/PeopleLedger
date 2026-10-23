@@ -1,31 +1,266 @@
 {
-  "PRN-01": { "status": "In progress", "evidence": "Result carries pack ref + content hash, engine version, trace, traceHash (`packages/pay/src/engine.ts`)" },
-  "PRN-03": { "status": "In progress", "evidence": "Reason-coded blocking issues; `engine.test.ts` 'explicit blocks'" },
-  "PRN-05": { "status": "In progress", "evidence": "Effective-dated versions with recorded time (`packages/people`)" },
-  "PRN-06": { "status": "In progress", "evidence": "decimal.js clone, DecimalString contract; no floats in pay" },
-  "PRN-07": { "status": "In progress", "evidence": "In-memory `assertTenant`; DB RLS not yet built" },
-  "EMP-01": { "status": "In progress", "evidence": "Person/Employment types only" },
-  "EMP-06": { "status": "In progress", "evidence": "Category evidence + precedence blocks (AC-06 shape)" },
-  "EMP-08": { "status": "In progress", "evidence": "`appendVersion`, `versionAsOf`, overlap validation" },
-  "PAY-06": { "status": "In progress", "evidence": "`PayrollCalculationSnapshot` contract; persistence not built" },
-  "PAY-11": { "status": "In progress", "evidence": "Balanced ledger draft; posting not built" },
-  "PAY-14": { "status": "In progress", "evidence": "Draft payslip model + text render; PDF/auth download not built" },
-  "TAX-04": { "status": "In progress", "evidence": "Income year, residency, scope gates" },
-  "TAX-05": { "status": "In progress", "evidence": "Unsupported treatments block" },
-  "TAX-06": { "status": "In progress", "evidence": "Exemption, threshold, slabs with intermediate trace" },
-  "TAX-08": { "status": "In progress", "evidence": "Explicit projection inputs and assumptions" },
-  "TAX-09": { "status": "In progress", "evidence": "Average-rate over remaining opportunities; off-cycle not built" },
-  "TAX-11": { "status": "In progress", "evidence": "Non-resident/undetermined residency blocked" },
-  "TAX-14": { "status": "In progress", "evidence": "Over-withholding never negative; warning raised" },
-  "LAW-01": { "status": "In progress", "evidence": "Parameters as data; mechanisms in engine code" },
-  "LAW-02": { "status": "In progress", "evidence": "Rule pack schema (`packages/pay/src/rule-pack.ts`); source file retention not built" },
-  "LAW-04": { "status": "In progress", "evidence": "Status set + approval gate bound to content hash; workflow UI/persistence not built" },
-  "LAW-05": { "status": "In progress", "evidence": "Open items / unverified evidence block production" },
-  "LAW-09": { "status": "In progress", "evidence": "Engine version pinned in result; artifact retention not built" },
-  "ARCH-01": { "status": "In progress", "evidence": "pnpm workspace, module packages (ADR-0001)" },
-  "ARCH-03": { "status": "In progress", "evidence": "Pure engine with serializable I/O" },
-  "GOV-05": { "status": "In progress", "evidence": "Per-parameter evidence record; grade A required" },
-  "GOV-06": { "status": "In progress", "evidence": "Test-only and status-tamper rejection tests" },
-  "NFR-12": { "status": "In progress", "evidence": "Synthetic fixtures only" },
-  "RPT-19": { "status": "In progress", "evidence": "Lakh/crore formatting helper" }
+  "ARCH-01": {
+    "status": "In progress",
+    "evidence": "pnpm workspace, module packages (ADR-0001)"
+  },
+  "ARCH-03": {
+    "status": "In progress",
+    "evidence": "Pure engine with serializable I/O"
+  },
+  "ARCH-04": {
+    "status": "Passed",
+    "evidence": "Each module's runtime SQL writes only tables its data contract assigns to it; People writes audit through the Platform `writeAudit` service; `contracts` holds types only.",
+    "tests": [
+      "packages/platform/test/architecture.test.ts"
+    ]
+  },
+  "ARCH-05": {
+    "status": "Passed",
+    "evidence": "Migrations 0001-0004 (expand) with composite FKs, scoped unique keys, check and exclusion constraints, optimistic `version` enforced by trigger, per-migration transactions; runner refuses contract migrations and downs without explicit flags, detects edited migrations, serializes concurrent runners; nothing runs migrations at startup.",
+    "tests": [
+      "packages/platform/test/db/migrations.db.test.ts",
+      "packages/platform/test/architecture.test.ts",
+      "packages/platform/test/db/workflow-authz.db.test.ts",
+      "packages/people/test/versioning.db.test.ts"
+    ]
+  },
+  "ARCH-06": {
+    "status": "Passed",
+    "evidence": "RLS on every runtime tenant table; tenant context via transaction-local set_config, fail-closed when missing; composite tenant FKs make cross-tenant references impossible (even for the owner); pooled-connection reuse, session-context leakage and worker processing tested; `app_has_permission` provides the application authorization decision (endpoint enforcement is SEC-01/RBAC-16).",
+    "tests": [
+      "packages/people/test/tenant-isolation.db.test.ts",
+      "packages/platform/test/db/workflow-authz.db.test.ts"
+    ]
+  },
+  "ARCH-07": {
+    "status": "Passed",
+    "evidence": "Transactional outbox with per-tenant dedupe keys; handler effect and idempotency key committed together; retries, crash-before-commit, lease expiry, racing processors and 4 concurrent workers produce exactly one effect. No payroll exists yet; the mechanism is generic.",
+    "tests": [
+      "packages/platform/test/db/outbox.db.test.ts"
+    ]
+  },
+  "AUD-01": {
+    "status": "Planned",
+    "evidence": "Partial: every data/security change in this layer is audited (enforced by DB). Missing: authentication, exports, report runs, document views, impersonation and other listed events (their features do not exist yet).",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "AUD-02": {
+    "status": "Passed",
+    "evidence": "All listed fields stored: id, UTC time, tenant, legal entity, actor and type, acting-as user, action, resource type/id, result, reason, source, IP, user agent, request and correlation id, before/after pointers.",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "AUD-03": {
+    "status": "Passed",
+    "evidence": "Restricted fields (per data contract) are written to audit as change markers only; values stay in versioned source tables referenced by id. No secrets are logged by this layer.",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts",
+      "packages/people/test/versioning.db.test.ts",
+      "packages/platform/test/classification.test.ts"
+    ]
+  },
+  "AUD-04": {
+    "status": "Planned",
+    "evidence": "Partial: category column with the eight AUD-04 categories. Missing: per-category retention and access.",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "AUD-05": {
+    "status": "Planned",
+    "evidence": "Not built: read logging configuration and aggregation."
+  },
+  "AUD-06": {
+    "status": "Planned",
+    "evidence": "Partial: append-only for every role (grants + triggers), per-tenant hash chain, integrity verification detects edits, broken links, gaps and truncated tail. Missing: per-period chains, periodic anchoring in a separate write-protected store, integrity report UI.",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "AUD-07": {
+    "status": "Planned",
+    "evidence": "Not built: retention per category, archive, legal hold."
+  },
+  "AUD-08": {
+    "status": "Passed",
+    "evidence": "Per-tenant isolation via RLS; deferred constraint triggers refuse to commit any change to tenant, legal_entity, membership, role, role_permission, role_assignment, person(_version), employment(_version) without an audit row in the same transaction; a failing audit insert rolls back the action.",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "AUD-09": {
+    "status": "Planned",
+    "evidence": "Partial: event time (occurred_at) and DB-clock recorded time stored and hashed. Missing: trusted time source configuration (operations).",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "EMP-01": {
+    "status": "In progress",
+    "evidence": "Person/Employment types only"
+  },
+  "EMP-06": {
+    "status": "In progress",
+    "evidence": "Category evidence + precedence blocks (AC-06 shape)"
+  },
+  "EMP-08": {
+    "status": "In progress",
+    "evidence": "`appendVersion`, `versionAsOf`, overlap validation"
+  },
+  "GOV-02": {
+    "status": "Planned",
+    "evidence": "Partial: state contracts with positive/denial tests (stale revisions, self-approval) for membership, role assignment and outbox events (docs/architecture/workflows). Other workflows are written when built.",
+    "tests": [
+      "packages/platform/test/db/workflow-authz.db.test.ts",
+      "packages/platform/test/db/outbox.db.test.ts"
+    ]
+  },
+  "GOV-03": {
+    "status": "Passed",
+    "evidence": "Entity/field contracts for all 17 tables in migrations 0001-0004 (types, constraints, owner, tenant scope, classification, effective/recorded time, retention class, API mapping, migration behaviour); a test fails if any table or column drifts from its contract; DB constraints reject representative invalid and cross-tenant inputs. Applies to every future table through the same test.",
+    "tests": [
+      "packages/platform/test/db/contracts.db.test.ts",
+      "packages/people/test/versioning.db.test.ts",
+      "packages/platform/test/db/workflow-authz.db.test.ts",
+      "packages/people/test/tenant-isolation.db.test.ts"
+    ]
+  },
+  "GOV-05": {
+    "status": "In progress",
+    "evidence": "Per-parameter evidence record; grade A required"
+  },
+  "GOV-06": {
+    "status": "In progress",
+    "evidence": "Test-only and status-tamper rejection tests"
+  },
+  "LAW-01": {
+    "status": "In progress",
+    "evidence": "Parameters as data; mechanisms in engine code"
+  },
+  "LAW-02": {
+    "status": "In progress",
+    "evidence": "Rule pack schema (`packages/pay/src/rule-pack.ts`); source file retention not built"
+  },
+  "LAW-04": {
+    "status": "In progress",
+    "evidence": "Status set + approval gate bound to content hash; workflow UI/persistence not built"
+  },
+  "LAW-05": {
+    "status": "In progress",
+    "evidence": "Open items / unverified evidence block production"
+  },
+  "LAW-09": {
+    "status": "In progress",
+    "evidence": "Engine version pinned in result; artifact retention not built"
+  },
+  "NFR-01": {
+    "status": "Planned",
+    "evidence": "Partial: TLS required for production DB connections; classification-driven log redaction. Missing: storage/backup encryption, field-level encryption and key management (Phase 0 hosting decision).",
+    "tests": [
+      "packages/platform/test/classification.test.ts"
+    ]
+  },
+  "NFR-03": {
+    "status": "Planned",
+    "evidence": "Partial: tamper-evident audit of all writes in this layer with actor, tenant, target, time, reason, before/after refs, correlation id. Missing: read/export logging of sensitive data.",
+    "tests": [
+      "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "NFR-12": {
+    "status": "In progress",
+    "evidence": "Synthetic fixtures only"
+  },
+  "PAY-06": {
+    "status": "In progress",
+    "evidence": "`PayrollCalculationSnapshot` contract; persistence not built"
+  },
+  "PAY-11": {
+    "status": "In progress",
+    "evidence": "Balanced ledger draft; posting not built"
+  },
+  "PAY-14": {
+    "status": "In progress",
+    "evidence": "Draft payslip model + text render; PDF/auth download not built"
+  },
+  "PRN-01": {
+    "status": "In progress",
+    "evidence": "Result carries pack ref + content hash, engine version, trace, traceHash (`packages/pay/src/engine.ts`)"
+  },
+  "PRN-03": {
+    "status": "In progress",
+    "evidence": "Reason-coded blocking issues; `engine.test.ts` 'explicit blocks'"
+  },
+  "PRN-05": {
+    "status": "In progress",
+    "evidence": "Effective-dated versions with recorded time (`packages/people`)"
+  },
+  "PRN-06": {
+    "status": "In progress",
+    "evidence": "decimal.js clone, DecimalString contract; no floats in pay"
+  },
+  "PRN-07": {
+    "status": "In progress",
+    "evidence": "DB tenant isolation for every runtime table and worker path (see ARCH-06); reports, files and integrations do not exist yet.",
+    "tests": [
+      "packages/people/test/tenant-isolation.db.test.ts"
+    ]
+  },
+  "RBAC-15": {
+    "status": "Planned",
+    "evidence": "Partial: separate pl_platform database role and withPlatform code path; platform role sees tenant metadata only and cannot read tenant data. Missing: platform staff role set, consent-based support access (RBAC-13).",
+    "tests": [
+      "packages/people/test/tenant-isolation.db.test.ts"
+    ]
+  },
+  "RBAC-16": {
+    "status": "Planned",
+    "evidence": "Partial: query-layer enforcement via RLS; permission catalogue iterated against the authorization decision. Missing: API and file layers and per-endpoint catalogue tests (no API yet).",
+    "tests": [
+      "packages/platform/test/db/workflow-authz.db.test.ts"
+    ]
+  },
+  "RPT-19": {
+    "status": "In progress",
+    "evidence": "Lakh/crore formatting helper"
+  },
+  "SEC-01": {
+    "status": "Planned",
+    "evidence": "Partial: deny-by-default `app_has_permission` with tenant and legal-entity scopes and effective dates. Missing: employee-relationship, field and other RBAC-03 scopes, endpoint enforcement.",
+    "tests": [
+      "packages/platform/test/db/workflow-authz.db.test.ts",
+      "packages/people/test/tenant-isolation.db.test.ts"
+    ]
+  },
+  "TAX-04": {
+    "status": "In progress",
+    "evidence": "Income year, residency, scope gates"
+  },
+  "TAX-05": {
+    "status": "In progress",
+    "evidence": "Unsupported treatments block"
+  },
+  "TAX-06": {
+    "status": "In progress",
+    "evidence": "Exemption, threshold, slabs with intermediate trace"
+  },
+  "TAX-08": {
+    "status": "In progress",
+    "evidence": "Explicit projection inputs and assumptions"
+  },
+  "TAX-09": {
+    "status": "In progress",
+    "evidence": "Average-rate over remaining opportunities; off-cycle not built"
+  },
+  "TAX-11": {
+    "status": "In progress",
+    "evidence": "Non-resident/undetermined residency blocked"
+  },
+  "TAX-14": {
+    "status": "In progress",
+    "evidence": "Over-withholding never negative; warning raised"
+  }
 }
