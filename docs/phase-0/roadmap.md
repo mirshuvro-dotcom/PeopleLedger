@@ -29,10 +29,18 @@ bounded feature at a time. This is the proposed order. Each step lists its requi
 - Transactional outbox with idempotent handlers (ARCH-07); workflow state contracts (GOV-02 partial); data
   contracts with schema drift test (GOV-03); module write ownership test (ARCH-04).
 
+**Slice 2: API and developer console**
+
+- Fastify API (`apps/api`): 22 tenant endpoints for organization, people, access and audit, each declared with a
+  catalogue permission and scope; decisions inside the tenant transaction; refusals audited; validation, cursor
+  pagination, stable error codes (SEC-01 partial, RBAC-16, ARCH-09 partial).
+- Next.js developer console (`apps/web`): progress dashboard, requirement matrix, organization, people with version
+  history, access & roles with a "why can this user…" check, audit log with chain verification, payroll calculator.
+- `pnpm dev:setup` (synthetic tenants through audited repositories) and `pnpm dev`.
+
 ## Next bounded features
 
-1. **API skeleton.** `apps/api` with request context → `withTenant`, endpoint-level `requirePermission`, and
-   catalogue-driven authorization tests per endpoint (SEC-01, RBAC-16).
+1. **Sign-in.** Email/password with MFA (IAM-01, IAM-02, IAM-05), sessions, replacing developer identity.
 2. **Audit completion.** Per-period chains and external anchoring, read/export logging, retention per category
    (AUD-04 – AUD-07, NFR-03).
 3. **Identity and permissions.** Sign-in and MFA, system role templates, remaining RBAC-03 scopes, field-level

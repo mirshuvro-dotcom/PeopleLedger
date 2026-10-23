@@ -69,4 +69,16 @@ tickets and estimates are assigned in Phase 0.
 ${body.join("\n")}
 `;
 writeFileSync(new URL("docs/traceability/requirements-matrix.md", root), out);
+
+// Machine-readable copy for the developer console's progress dashboard.
+const family = (id: string) => id.replace(/-\d+$/, "");
+const matrix = {
+  generatedFrom: "docs/requirements/PeopleLedger_Product_Requirements_v3.1_Final.md + docs/traceability/status.json",
+  totals: { requirements: rows.length, byStatus: counts, byRelease: { R0: releases("R0"), R1: releases("R1"), R2: releases("R2") } },
+  rows: rows.map(([, id, release, role, deps, test]) => {
+    const s = status[id!] ?? { status: "Planned", evidence: "" };
+    return { id, family: family(id!), release, accountableRole: role!.trim(), dependencies: deps!.trim(), acceptanceTest: test, status: s.status, evidence: s.evidence, tests: s.tests ?? [] };
+  }),
+};
+writeFileSync(new URL("docs/traceability/matrix.json", root), `${JSON.stringify(matrix, null, 2)}\n`);
 console.log(`Wrote ${rows.length} rows: ${JSON.stringify(counts)}`);

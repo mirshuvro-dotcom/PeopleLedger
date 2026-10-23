@@ -39,11 +39,19 @@
       "packages/platform/test/db/outbox.db.test.ts"
     ]
   },
+  "ARCH-09": {
+    "status": "Planned",
+    "evidence": "Partial: versioned /v1 API, server-side validation rejecting unknown fields, cursor pagination with bounded limits. Missing: webhook payload versioning, async bulk actions, tenant-scoped caching (none exist yet).",
+    "tests": [
+      "apps/api/test/api.db.test.ts"
+    ]
+  },
   "AUD-01": {
     "status": "Planned",
-    "evidence": "Partial: every data/security change in this layer is audited (enforced by DB). Missing: authentication, exports, report runs, document views, impersonation and other listed events (their features do not exist yet).",
+    "evidence": "Partial: every data/security change in this layer is audited (enforced by DB) and every refused API request is audited as authorization.denied. Missing: authentication, exports, report runs, document views, impersonation and other listed events (their features do not exist yet).",
     "tests": [
-      "packages/platform/test/db/audit.db.test.ts"
+      "packages/platform/test/db/audit.db.test.ts",
+      "apps/api/test/api.db.test.ts"
     ]
   },
   "AUD-02": {
@@ -96,6 +104,13 @@
     "evidence": "Partial: event time (occurred_at) and DB-clock recorded time stored and hashed. Missing: trusted time source configuration (operations).",
     "tests": [
       "packages/platform/test/db/audit.db.test.ts"
+    ]
+  },
+  "AUD-10": {
+    "status": "Planned",
+    "evidence": "Partial: activity log screen (developer console) with category/action/result/resource filters, cursor paging and a detail view of before/after and context; chain verification button. Missing: actor/entity/date-range/free-text filters, saved filters, related events by correlation id, production UI.",
+    "tests": [
+      "apps/api/test/api.db.test.ts"
     ]
   },
   "EMP-01": {
@@ -217,9 +232,10 @@
     ]
   },
   "RBAC-16": {
-    "status": "Planned",
-    "evidence": "Partial: query-layer enforcement via RLS; permission catalogue iterated against the authorization decision. Missing: API and file layers and per-endpoint catalogue tests (no API yet).",
+    "status": "Passed",
+    "evidence": "Every API endpoint is declared with a catalogue permission and scope; tests iterate every endpoint: 401 without identity, 403 for a member with no permissions, 403 when holding every permission except the declared one, 200/201 with all permissions, 403 for non-members. Query layer enforced by RLS (ARCH-06). No file endpoints exist yet; when documents arrive they must join the same suite.",
     "tests": [
+      "apps/api/test/api.db.test.ts",
       "packages/platform/test/db/workflow-authz.db.test.ts"
     ]
   },
@@ -229,10 +245,11 @@
   },
   "SEC-01": {
     "status": "Planned",
-    "evidence": "Partial: deny-by-default `app_has_permission` with tenant and legal-entity scopes and effective dates. Missing: employee-relationship, field and other RBAC-03 scopes, endpoint enforcement.",
+    "evidence": "Partial: deny-by-default decision with tenant, legal-entity and row-filtered scopes enforced on every API endpoint. Missing: employee-relationship, field and remaining RBAC-03 scopes.",
     "tests": [
+      "apps/api/test/api.db.test.ts",
       "packages/platform/test/db/workflow-authz.db.test.ts",
-      "packages/people/test/tenant-isolation.db.test.ts"
+      "apps/api/test/config.test.ts"
     ]
   },
   "TAX-04": {

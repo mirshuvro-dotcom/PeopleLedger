@@ -21,8 +21,25 @@ Requirement IDs (e.g. `TAX-09`, `LAW-04`) from that document appear in code comm
 | Pay | `packages/pay` | Exact decimal money, rule-pack schema and governance gate, deterministic `calculatePayroll`, draft bilingual payslip |
 | Fixtures | `tests/fixtures/rule-packs` | Appendix B TEST ONLY pack as data |
 
-Not built yet: API, web UI, worker process, sign-in and MFA, and everything else listed as Planned in the matrix.
+| API | `apps/api` | Fastify HTTP API: every endpoint permission-checked inside the tenant transaction, refusals audited |
+| Developer console | `apps/web` | Next.js UI to inspect the build: progress, requirements, organization, people, access, audit log, payroll calculator |
+
+Not built yet: real sign-in and MFA (the console uses a synthetic identity switcher), worker process, and everything
+else listed as Planned in the matrix.
 See [docs/phase-0/roadmap.md](docs/phase-0/roadmap.md) for the build order.
+
+## Developer console (quick start)
+
+```sh
+cp .env.example .env          # Windows: Copy-Item .env.example .env — then set PGPASSWORD in it
+pnpm install
+pnpm dev:setup                # creates peopleledger_dev, applies migrations, seeds synthetic tenants
+pnpm dev                      # API on http://localhost:4000, console on http://localhost:3000
+```
+
+Open http://localhost:3000 and use **Acting as** to switch between synthetic users (administrator, HR officer,
+auditor, an entity-scoped viewer, a user with no roles) and see authorization, isolation and audit in action.
+`pnpm dev:setup` rebuilds the dev database from scratch every time and refuses any database not ending in `_dev`.
 
 ## Setup
 

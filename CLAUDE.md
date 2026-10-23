@@ -28,6 +28,9 @@ These apply to every contributor, including AI assistants. They condense Section
   audit event in the same transaction as every sensitive change (the database refuses to commit otherwise).
   Migrations are additive (`-- phase: expand`) unless a reviewed contract migration is intended; never run them
   from application code. A module writes only the tables its contract assigns to it.
+- **API rules.** Declare every tenant endpoint with `tenantRoute` and a catalogue permission; add a sample request in
+  `apps/api/test/api.db.test.ts` (the suite fails otherwise). Handlers call module repositories, never write SQL.
+  Developer identity is a dev-only stand-in for sign-in and must never be enabled in production.
 - **Synthetic data only.** No real names, salaries, bank, NID or TIN values in code, fixtures, logs or prompts.
 - **History is immutable.** Effective-dated changes append versions; approved/posted records are corrected by
   linked adjustments, never edits.

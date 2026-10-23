@@ -24,7 +24,12 @@ jobs:
           --health-retries 10
     env:
       PEOPLELEDGER_DB_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
-      PEOPLELEDGER_DB_MIGRATION_URL: postgres://postgres:postgres@localhost:5432/postgres
+      PEOPLELEDGER_DB_MIGRATION_URL: postgres://postgres:postgres@localhost:5432/peopleledger_dev
+      PEOPLELEDGER_ENV: development
+      PEOPLELEDGER_APP_DB_URL: postgres://pl_dev_app:ci-only-app@localhost:5432/peopleledger_dev
+      PEOPLELEDGER_WORKER_DB_URL: postgres://pl_dev_worker:ci-only-worker@localhost:5432/peopleledger_dev
+      PEOPLELEDGER_PLATFORM_DB_URL: postgres://pl_dev_platform:ci-only-platform@localhost:5432/peopleledger_dev
+      NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -36,11 +41,13 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm test:db
-      - name: Migrations apply through the CLI on a clean database
-        run: pnpm db roles && pnpm db up && pnpm db status
+      - name: Developer environment builds and seeds from scratch
+        run: pnpm dev:setup && pnpm db status
+      - name: Web console production build
+        run: pnpm build:web
       - run: pnpm demo:slice
       - name: Generated docs are up to date
         run: |
           pnpm traceability
           pnpm data-contracts
-          git diff --exit-code docs/traceability/requirements-matrix.md docs/data-contracts
+          git diff --exit-code docs/traceability docs/data-contracts

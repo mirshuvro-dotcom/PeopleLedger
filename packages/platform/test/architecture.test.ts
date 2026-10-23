@@ -47,6 +47,22 @@ describe("module ownership of writes (ARCH-04)", () => {
   });
 });
 
+describe("deployment units write only through module services (ARCH-04)", () => {
+  it("apps contain no direct table writes", () => {
+    const appsDir = fileURLToPath(new URL("../../../apps/", import.meta.url));
+    const offenders = readdirSync(appsDir).flatMap((app) => {
+      try {
+        return sourceFiles(join(appsDir, app, "src"))
+          .filter((file) => /\b(?:INSERT INTO|UPDATE|DELETE FROM)\s+[a-z_]+/.test(readFileSync(file, "utf8")))
+          .map((file) => relative(appsDir, file).split(sep).join("/"));
+      } catch {
+        return [];
+      }
+    });
+    expect(offenders).toEqual([]);
+  });
+});
+
 describe("no migrations at startup (ARCH-05)", () => {
   it("only the migration module itself references migrateUp/migrateDown in runtime source", () => {
     const callers = runtime.filter(({ file, text }) => /migrate(Up|Down)\(/.test(text) && !rel(file).endsWith("db/migrate.ts"));

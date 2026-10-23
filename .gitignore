@@ -5,3 +5,11 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Local developer data (synthetic identities)
+.dev-seed.json
+
+# Next.js build output
+.next/
+apps/web/.next/
+*.tsbuildinfo
