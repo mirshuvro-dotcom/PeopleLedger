@@ -6,11 +6,14 @@
  * Requirements: ARCH-04, ARCH-05.
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { loadDataContracts } from "../src/index.js";
 
-const packagesDir = new URL("../../", import.meta.url).pathname;
+const packagesDir = fileURLToPath(new URL("../../", import.meta.url));
+/** Repo-relative path with forward slashes, on any OS. */
+const rel = (file: string) => relative(packagesDir, file).split(sep).join("/");
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
@@ -32,7 +35,7 @@ describe("module ownership of writes (ARCH-04)", () => {
   const writes = runtime.flatMap(({ pkg, file, text }) =>
     [...text.matchAll(/\b(?:INSERT INTO|UPDATE|DELETE FROM)\s+([a-z_]+)/g)]
       .filter((m) => owners.has(m[1]!))
-      .map((m) => ({ pkg, file: file.replace(packagesDir, ""), table: m[1]! })),
+      .map((m) => ({ pkg, file: rel(file), table: m[1]! })),
   );
 
   it("finds the repository writes", () => {
@@ -46,7 +49,7 @@ describe("module ownership of writes (ARCH-04)", () => {
 
 describe("no migrations at startup (ARCH-05)", () => {
   it("only the migration module itself references migrateUp/migrateDown in runtime source", () => {
-    const callers = runtime.filter(({ file, text }) => /migrate(Up|Down)\(/.test(text) && !file.endsWith("db/migrate.ts"));
-    expect(callers.map((c) => c.file)).toEqual([]);
+    const callers = runtime.filter(({ file, text }) => /migrate(Up|Down)\(/.test(text) && !rel(file).endsWith("db/migrate.ts"));
+    expect(callers.map((c) => rel(c.file))).toEqual([]);
   });
 });

@@ -11,7 +11,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 
 const root = new URL("../", import.meta.url);
-const spec = readFileSync(new URL("docs/requirements/PeopleLedger_Product_Requirements_v3.1_Final.md", root), "utf8");
+// Normalize CRLF (Windows checkouts) so the row pattern below matches.
+const spec = readFileSync(new URL("docs/requirements/PeopleLedger_Product_Requirements_v3.1_Final.md", root), "utf8").replace(/\r\n/g, "\n");
 const STATUSES = ["Planned", "In progress", "Passed"];
 const status: Record<string, { status: string; evidence: string; tests?: string[] }> = JSON.parse(
   readFileSync(new URL("docs/traceability/status.json", root), "utf8"),

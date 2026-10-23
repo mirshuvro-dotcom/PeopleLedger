@@ -1,0 +1,5 @@
+# Keep LF everywhere, including Windows checkouts: migration checksums, SQL
+# headers, generated docs and the spec parser all assume LF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary

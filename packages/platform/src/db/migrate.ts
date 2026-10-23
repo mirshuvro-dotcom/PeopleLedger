@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type pg from "pg";
 
 /**
@@ -25,7 +26,8 @@ export interface Migration {
   readonly checksum: string;
 }
 
-export const DEFAULT_MIGRATIONS_DIR = new URL("../../../../db/migrations/", import.meta.url).pathname;
+// fileURLToPath, not URL.pathname: handles Windows drive letters and spaces in the path.
+export const DEFAULT_MIGRATIONS_DIR = fileURLToPath(new URL("../../../../db/migrations/", import.meta.url));
 const LOCK_KEY = 7_316_220_901; // arbitrary constant for pg_advisory_lock
 
 export class MigrationError extends Error {
