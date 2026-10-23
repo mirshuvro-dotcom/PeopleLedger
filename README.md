@@ -20,7 +20,6 @@ Requirement IDs (e.g. `TAX-09`, `LAW-04`) from that document appear in code comm
 | Database | `db/` | Migrations (`db/migrations`), cluster roles (`db/roles.sql`), data contracts (`db/contracts/entities.json`) |
 | Pay | `packages/pay` | Exact decimal money, rule-pack schema and governance gate, deterministic `calculatePayroll`, draft bilingual payslip |
 | Fixtures | `tests/fixtures/rule-packs` | Appendix B TEST ONLY pack as data |
-
 | API | `apps/api` | Fastify HTTP API: every endpoint permission-checked inside the tenant transaction, refusals audited |
 | Developer console | `apps/web` | Next.js UI to inspect the build: progress, requirements, organization, people, access, audit log, payroll calculator |
 
