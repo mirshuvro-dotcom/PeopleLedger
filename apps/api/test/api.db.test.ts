@@ -8,7 +8,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { InjectOptions } from "fastify";
-import { assignRole, changeMembershipStatus, createRole, inviteMember, withTenant } from "@peopleledger/platform";
+import { assignRole, AuthService, changeMembershipStatus, createRole, DataKey, inviteMember, withTenant } from "@peopleledger/platform";
 import { createEmployment, createPerson } from "@peopleledger/people";
 import { createDatabase, seedTenant, userCtx, type SeededTenant, type TestDb } from "../../../packages/platform/test/db/support.js";
 import { buildServer } from "../src/server.js";
@@ -20,6 +20,7 @@ let api: Server;
 let A: SeededTenant & { admin: string; nobody: string; viewer: string; servicesEntity: string; personId: string; roleId: string; assignmentId: string; memberId: string };
 let B: SeededTenant & { admin: string; personId: string };
 let allPermissions: string[];
+let auth: AuthService;
 
 async function member(t: SeededTenant, email: string, roles: { roleId: string; entity?: string }[]): Promise<string> {
   return withTenant(db.app, userCtx(t.tenantId), async (tx) => {
@@ -35,7 +36,8 @@ async function member(t: SeededTenant, email: string, roles: { roleId: string; e
 beforeAll(async () => {
   db = await createDatabase();
   allPermissions = (await db.admin.query<{ code: string }>("SELECT code FROM permission ORDER BY code")).rows.map((r) => r.code);
-  api = buildServer({ config: { devAuth: true, environment: "test", repoRoot: new URL("../../../", import.meta.url) }, appPool: db.app, logger: false });
+  auth = new AuthService({ authPool: db.auth, appPool: db.app, dataKey: DataKey.fromBase64(DataKey.generateBase64()), settings: { scrypt: { N: 2 ** 12, r: 8, p: 1 } } });
+  api = buildServer({ config: { devAuth: true, environment: "test", webOrigin: "http://localhost:3000", repoRoot: new URL("../../../", import.meta.url) }, appPool: db.app, auth, logger: false });
 
   const a = await seedTenant(db, "ApiA");
   const seeded = await withTenant(db.app, userCtx(a.tenantId), async (tx) => {
@@ -87,6 +89,7 @@ function sampleRequest(method: string, url: string): { url: string; payload?: un
     "POST /v1/legal-entities": { url: "/v1/legal-entities", payload: { legalNameEn: `Entity ${unique}` } },
     "GET /v1/members": { url: "/v1/members" },
     "POST /v1/members": { url: "/v1/members", payload: { email: `new-${unique}@a.example.test` } },
+    "POST /v1/members/:id/access-link": { url: `/v1/members/${A.memberId}/access-link` },
     "POST /v1/members/:id/status": { url: `/v1/members/${A.memberId}/status`, payload: { status: "suspended", expectedVersion: 999, reason: "probe" } },
     "GET /v1/permissions": { url: "/v1/permissions" },
     "GET /v1/roles": { url: "/v1/roles" },
@@ -114,7 +117,7 @@ function sampleRequest(method: string, url: string): { url: string; payload?: un
 
 describe("every endpoint (RBAC-16)", () => {
   it("declares a permission from the catalogue (or membership-only)", () => {
-    expect(api.tenantRoutes.length).toBeGreaterThanOrEqual(22);
+    expect(api.tenantRoutes.length).toBeGreaterThanOrEqual(23);
     for (const r of api.tenantRoutes) {
       if (r.scope === "membership") expect(r.permission).toBeNull();
       else expect(allPermissions).toContain(r.permission);
@@ -266,7 +269,7 @@ describe("input validation and responses (ARCH-09)", () => {
 
 describe("developer identity switched off", () => {
   it("rejects tenant calls and does not expose developer endpoints", async () => {
-    const prod = buildServer({ config: { devAuth: false, environment: "test", repoRoot: new URL("../../../", import.meta.url) }, appPool: db.app, logger: false });
+    const prod = buildServer({ config: { devAuth: false, environment: "test", webOrigin: "http://localhost:3000", repoRoot: new URL("../../../", import.meta.url) }, appPool: db.app, auth, logger: false });
     try {
       expect((await prod.inject({ method: "GET", url: "/v1/people", headers: as(A.tenantId, A.admin) })).statusCode).toBe(401);
       expect((await prod.inject({ method: "GET", url: "/dev/identities" })).statusCode).toBe(404);

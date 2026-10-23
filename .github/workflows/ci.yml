@@ -29,6 +29,9 @@ jobs:
       PEOPLELEDGER_APP_DB_URL: postgres://pl_dev_app:ci-only-app@localhost:5432/peopleledger_dev
       PEOPLELEDGER_WORKER_DB_URL: postgres://pl_dev_worker:ci-only-worker@localhost:5432/peopleledger_dev
       PEOPLELEDGER_PLATFORM_DB_URL: postgres://pl_dev_platform:ci-only-platform@localhost:5432/peopleledger_dev
+      PEOPLELEDGER_AUTH_DB_URL: postgres://pl_dev_auth:ci-only-auth@localhost:5432/peopleledger_dev
+      # Throwaway CI key (all zeros) for secrets at rest; never used outside CI.
+      PEOPLELEDGER_DATA_KEY: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
       NEXT_TELEMETRY_DISABLED: "1"
     steps:
       - uses: actions/checkout@v4

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { assignRole, changeMembershipStatus, createRole, endRoleAssignment, hasPermission, inviteMember } from "@peopleledger/platform";
+import { assignRole, changeMembershipStatus, createRole, endRoleAssignment, hasPermission, inviteMember, issueAccessLink } from "@peopleledger/platform";
 import { tenantRoute, type RouteDeps } from "../tenant-route.js";
 import { body, idParams, isoDate, text, uuid } from "./schemas.js";
 
@@ -66,6 +66,19 @@ export function accessRoutes(app: FastifyInstance, deps: RouteDeps): void {
       const { id } = req.params as { id: string };
       const b = req.body as { status: "active" | "suspended" | "revoked"; expectedVersion: number; reason: string };
       return { version: await changeMembershipStatus(tx, { membershipId: id, ...b }) };
+    },
+  });
+
+  // IAM-01: one-time link to set (invited) or reset (active) a password. Shown once; email delivery is COM-01.
+  tenantRoute(app, deps, {
+    method: "POST",
+    url: "/v1/members/:id/access-link",
+    permission: "membership:create",
+    successStatus: 201,
+    schema: { params: idParams },
+    handler: async ({ tx, req }) => {
+      const link = await issueAccessLink(tx, (req.params as { id: string }).id);
+      return { path: `/setup?token=${encodeURIComponent(link.token)}`, purpose: link.purpose, expiresAt: link.expiresAt };
     },
   });
 

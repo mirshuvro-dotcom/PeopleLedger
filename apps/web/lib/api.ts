@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useIdentity } from "@/components/IdentityProvider";
 
 export interface ApiErrorBody {
-  error: { code: string; message: string; correlationId: string };
+  error: { code: string; message: string; correlationId: string; details?: string[] };
 }
 
 export class ApiFailure extends Error {
@@ -13,6 +13,7 @@ export class ApiFailure extends Error {
     readonly code: string,
     message: string,
     readonly correlationId: string,
+    readonly details: string[] = [],
   ) {
     super(message);
   }
@@ -31,17 +32,20 @@ export async function apiFetch<T>(path: string, identity: Identity | null, init:
     headers["x-dev-user-id"] = identity.userId;
   }
   if (init.body !== undefined) headers["content-type"] = "application/json";
+  // CSRF protection header: required by the API for every state-changing request.
+  if ((init.method ?? "GET") !== "GET") headers["x-pl-csrf"] = "1";
   const res = await fetch(`/api${path}`, {
     method: init.method ?? "GET",
     headers,
     cache: "no-store",
+    credentials: "same-origin",
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
   const text = await res.text();
   const json = text ? (JSON.parse(text) as unknown) : null;
   if (!res.ok) {
     const e = (json as ApiErrorBody | null)?.error;
-    throw new ApiFailure(res.status, e?.code ?? "HTTP_" + res.status, e?.message ?? res.statusText, e?.correlationId ?? "");
+    throw new ApiFailure(res.status, e?.code ?? "HTTP_" + res.status, e?.message ?? res.statusText, e?.correlationId ?? "", e?.details ?? []);
   }
   return json as T;
 }
@@ -57,7 +61,7 @@ export interface Loadable<T> {
 export function useApi<T>(path: string | null): Loadable<T> {
   const { identity, ready } = useIdentity();
   // Tenant endpoints wait until the developer identity is known, so no request goes out unauthenticated.
-  const waiting = path !== null && path.startsWith("/v1/") && !ready;
+  const waiting = path !== null && (path.startsWith("/v1/") || path.startsWith("/auth/")) && !ready;
   const [state, setState] = useState<{ data: T | null; error: ApiFailure | null; loading: boolean }>({ data: null, error: null, loading: true });
   const [tick, setTick] = useState(0);
   const reload = useCallback(() => setTick((t) => t + 1), []);

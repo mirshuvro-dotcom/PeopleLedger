@@ -30,7 +30,10 @@ These apply to every contributor, including AI assistants. They condense Section
   from application code. A module writes only the tables its contract assigns to it.
 - **API rules.** Declare every tenant endpoint with `tenantRoute` and a catalogue permission; add a sample request in
   `apps/api/test/api.db.test.ts` (the suite fails otherwise). Handlers call module repositories, never write SQL.
-  Developer identity is a dev-only stand-in for sign-in and must never be enabled in production.
+  Developer identity is a dev-only shortcut and must never be enabled in production; real users sign in.
+- **Auth rules.** Authentication tables are reachable only through `AuthService` and the `pl_auth` role. Store only
+  hashes of tokens and recovery codes; encrypt secrets with `DataKey`; never log passwords, tokens or emails in
+  `auth_event`. Every cookie-authenticated POST needs the CSRF header.
 - **Synthetic data only.** No real names, salaries, bank, NID or TIN values in code, fixtures, logs or prompts.
 - **History is immutable.** Effective-dated changes append versions; approved/posted records are corrected by
   linked adjustments, never edits.

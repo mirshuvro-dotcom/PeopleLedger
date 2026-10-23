@@ -38,9 +38,17 @@ bounded feature at a time. This is the proposed order. Each step lists its requi
   history, access & roles with a "why can this user…" check, audit log with chain verification, payroll calculator.
 - `pnpm dev:setup` (synthetic tenants through audited repositories) and `pnpm dev`.
 
+**Slice 3: sign-in**
+
+- Migration 0005 and the `pl_auth` role: credentials (scrypt), encrypted TOTP secrets, recovery codes, challenges,
+  per-tenant sessions, one-time setup links, append-only authentication events (IAM-01/02/04/05 partial, AUD-01).
+- MFA enforced for critical permissions (SEC-05 partial); sessions end on suspension (RBAC-17 partial); CSRF, lockout and
+  rate limits (NFR-02 partial). Sign-in, setup-link and My account pages.
+
 ## Next bounded features
 
-1. **Sign-in.** Email/password with MFA (IAM-01, IAM-02, IAM-05), sessions, replacing developer identity.
+1. **Passkeys and identity completion.** WebAuthn (IAM-01), per-tenant security policy (IAM-02), user ↔ person link
+   (IAM-04), unusual-login alerts (IAM-05, AUD-15).
 2. **Audit completion.** Per-period chains and external anchoring, read/export logging, retention per category
    (AUD-04 – AUD-07, NFR-03).
 3. **Identity and permissions.** Sign-in and MFA, system role templates, remaining RBAC-03 scopes, field-level

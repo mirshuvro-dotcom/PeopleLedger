@@ -30,6 +30,7 @@ Periods are not decided yet (see docs/phase-0/open-questions.md). Nothing is del
 | `operational-transient` | Delivery/processing bookkeeping; purge after completion window. Period: not yet decided. |
 | `product-catalogue` | Product-versioned reference data; kept while referenced. |
 | `schema-metadata` | Kept for the life of the database. |
+| `authentication` | Credentials, MFA secrets and sessions: kept while the account exists; sessions and challenges purged after expiry plus a security review window. Period: not yet decided. |
 
 ## Entities
 
@@ -52,3 +53,10 @@ Periods are not decided yet (see docs/phase-0/open-questions.md). Nothing is del
 | [`outbox_event`](outbox_event.md) | platform | yes | infrastructure | `operational-transient` |
 | [`idempotency_key`](idempotency_key.md) | platform | yes | infrastructure | `operational-transient` |
 | [`schema_migrations`](schema_migrations.md) | platform | no | infrastructure | `schema-metadata` |
+| [`user_credential`](user_credential.md) | platform | no | aggregate-root | `authentication` |
+| [`user_totp`](user_totp.md) | platform | no | aggregate-root | `authentication` |
+| [`user_recovery_code`](user_recovery_code.md) | platform | no | association | `authentication` |
+| [`auth_challenge`](auth_challenge.md) | platform | no | infrastructure | `authentication` |
+| [`auth_session`](auth_session.md) | platform | no | aggregate-root | `authentication` |
+| [`auth_setup_token`](auth_setup_token.md) | platform | no | infrastructure | `authentication` |
+| [`auth_event`](auth_event.md) | platform | no | append-only-log | `audit-trail` |

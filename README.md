@@ -23,8 +23,10 @@ Requirement IDs (e.g. `TAX-09`, `LAW-04`) from that document appear in code comm
 | API | `apps/api` | Fastify HTTP API: every endpoint permission-checked inside the tenant transaction, refusals audited |
 | Developer console | `apps/web` | Next.js UI to inspect the build: progress, requirements, organization, people, access, audit log, payroll calculator |
 
-Not built yet: real sign-in and MFA (the console uses a synthetic identity switcher), worker process, and everything
-else listed as Planned in the matrix.
+Sign-in: email and password, authenticator-app MFA (required for users with critical permissions), recovery codes,
+one-time setup/reset links, per-tenant sessions with idle and absolute expiry ([ADR-0005](docs/architecture/adr/0005-authentication.md)).
+
+Not built yet: passkeys (WebAuthn), email delivery, worker process, and everything else listed as Planned in the matrix.
 See [docs/phase-0/roadmap.md](docs/phase-0/roadmap.md) for the build order.
 
 ## Developer console (quick start)
@@ -36,8 +38,10 @@ pnpm dev:setup                # creates peopleledger_dev, applies migrations, se
 pnpm dev                      # API on http://localhost:4000, console on http://localhost:3000
 ```
 
-Open http://localhost:3000 and use **Acting as** to switch between synthetic users (administrator, HR officer,
-auditor, an entity-scoped viewer, a user with no roles) and see authorization, isolation and audit in action.
+Open http://localhost:3000/login and sign in with any active synthetic account (for example `hr@software.example.test`)
+and the shared development password printed by `pnpm dev:setup`. `admin@software.example.test` holds critical
+permissions, so it must set up an authenticator app first. The **Developer identity** switcher (dev only) lets you jump
+between synthetic users without signing in.
 `pnpm dev:setup` rebuilds the dev database from scratch every time and refuses any database not ending in `_dev`.
 
 ## Setup

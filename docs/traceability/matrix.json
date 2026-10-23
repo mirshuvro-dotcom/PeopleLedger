@@ -160,8 +160,11 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-SEC-05",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: MFA enforced for users holding critical permissions (enrolment gate on every tenant endpoint). Missing: step-up MFA for sensitive approvals (approval workflows not built). Identity model supports later SSO.",
+      "tests": [
+        "apps/api/test/auth-http.db.test.ts",
+        "packages/platform/test/db/auth.db.test.ts"
+      ]
     },
     {
       "id": "ORG-01",
@@ -1441,8 +1444,11 @@
       "dependencies": "BASE + OPS",
       "acceptanceTest": "AT-NFR-02",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: secure HttpOnly/SameSite cookies, hashed tokens, MFA, setup-link expiry, lockout and rate limits, CSRF header + Origin check, server-side validation, parameterized SQL. Missing: file validation and malware scanning (no file uploads yet), membership invitation expiry.",
+      "tests": [
+        "apps/api/test/auth-http.db.test.ts",
+        "packages/platform/test/db/auth.db.test.ts"
+      ]
     },
     {
       "id": "NFR-03",
@@ -2636,8 +2642,11 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-RBAC-17",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: suspending or revoking a membership ends that user's sessions in the tenant immediately; password reset/change ends sessions. Missing: reassigning pending approvals and flagging owned work items (no approval workflows yet).",
+      "tests": [
+        "packages/platform/test/db/auth.db.test.ts",
+        "apps/api/test/auth-http.db.test.ts"
+      ]
     },
     {
       "id": "IAM-01",
@@ -2647,8 +2656,12 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-IAM-01",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: email/password (scrypt, NIST-style policy with offline common-password list), TOTP MFA with replay protection, single-use recovery codes, one-time setup/reset links (account recovery). Missing: WebAuthn passkeys, breach-corpus check, trusted-device policy.",
+      "tests": [
+        "packages/platform/test/auth-primitives.test.ts",
+        "packages/platform/test/db/auth.db.test.ts",
+        "apps/api/test/auth-http.db.test.ts"
+      ]
     },
     {
       "id": "IAM-02",
@@ -2658,8 +2671,11 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-IAM-02",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: lockout after 5 failures (15 min), 30 min idle / 12 h absolute session timeout, setup-link expiry, MFA required for critical permissions. Missing: per-tenant configurable policy (password rules, MFA by role, IP allow lists, domains, concurrent session limits).",
+      "tests": [
+        "packages/platform/test/db/auth.db.test.ts",
+        "apps/api/test/auth-http.db.test.ts"
+      ]
     },
     {
       "id": "IAM-03",
@@ -2680,8 +2696,11 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-IAM-04",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: one account can belong to several tenants; sessions are per tenant and only for active members; accounts without person records are supported. Missing: explicit user-account to person/employee link.",
+      "tests": [
+        "packages/platform/test/db/auth.db.test.ts",
+        "apps/api/test/auth-http.db.test.ts"
+      ]
     },
     {
       "id": "IAM-05",
@@ -2691,8 +2710,11 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-IAM-05",
       "status": "Planned",
-      "evidence": "",
-      "tests": []
+      "evidence": "Partial: My account lists the user's sessions with address, sign-in and last activity, and revokes others. Missing: device naming and unusual-login alerts.",
+      "tests": [
+        "packages/platform/test/db/auth.db.test.ts",
+        "apps/api/test/auth-http.db.test.ts"
+      ]
     },
     {
       "id": "IAM-06",
@@ -2713,10 +2735,11 @@
       "dependencies": "AUTH",
       "acceptanceTest": "AT-AUD-01",
       "status": "Planned",
-      "evidence": "Partial: every data/security change in this layer is audited (enforced by DB) and every refused API request is audited as authorization.denied. Missing: authentication, exports, report runs, document views, impersonation and other listed events (their features do not exist yet).",
+      "evidence": "Partial: every data/security change in this layer is audited (enforced by DB) and every refused API request is audited as authorization.denied. Authentication events (logins, failures, lockouts, MFA, sessions, passwords) go to the append-only auth_event log, and session creation/revocation to the tenant audit chain. Missing: exports, report runs, document views, impersonation and other listed events (their features do not exist yet).",
       "tests": [
+        "apps/api/test/api.db.test.ts",
         "packages/platform/test/db/audit.db.test.ts",
-        "apps/api/test/api.db.test.ts"
+        "packages/platform/test/db/auth.db.test.ts"
       ]
     },
     {

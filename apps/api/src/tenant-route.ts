@@ -2,15 +2,20 @@ import { randomUUID } from "node:crypto";
 import type { FastifyInstance, FastifyReply, FastifyRequest, FastifySchema } from "fastify";
 import type pg from "pg";
 import {
+  AuthService,
   businessDateInDhaka,
   isUuid,
   requirePermission,
   withTenant,
   writeAudit,
   type RequestContext,
+  type SessionInfo,
   type TenantTx,
 } from "@peopleledger/platform";
 import { ApiError, unauthenticated } from "./errors.js";
+import { assertCsrf, readCookie } from "./http.js";
+
+export const SESSION_COOKIE = "pl_session";
 
 /**
  * Every tenant endpoint is declared through `tenantRoute`, which makes the
@@ -58,7 +63,9 @@ export interface RegisteredRoute {
 
 export interface RouteDeps {
   readonly appPool: pg.Pool;
+  readonly auth: AuthService;
   readonly devAuth: boolean;
+  readonly webOrigin: string;
   readonly routes: RegisteredRoute[];
 }
 
@@ -75,27 +82,40 @@ export function correlationIdOf(req: FastifyRequest): string {
   return typeof header === "string" && CORRELATION.test(header) ? header : randomUUID();
 }
 
+export interface Caller {
+  readonly ctx: RequestContext & { userId: string };
+  /** Null when the caller used developer identity. */
+  readonly session: SessionInfo | null;
+}
+
 /**
- * Developer identity (stand-in for IAM-01 sign-in): `x-dev-tenant-id` and
- * `x-dev-user-id` headers. Only honoured when dev auth is enabled, which the
- * config refuses in production. Membership is verified by the permission check.
+ * Who is calling: a signed-in session (cookie) or, only when developer
+ * identity is enabled (never in production), the `x-dev-tenant-id` /
+ * `x-dev-user-id` headers. A cookie always wins over headers.
  */
-export function requestContext(req: FastifyRequest, devAuth: boolean): RequestContext & { userId: string } {
-  if (!devAuth) throw unauthenticated("Sign-in is not available yet (IAM-01); this server has developer identity disabled.");
-  const tenantId = req.headers["x-dev-tenant-id"];
-  const userId = req.headers["x-dev-user-id"];
-  if (!isUuid(tenantId) || !isUuid(userId)) throw unauthenticated("Choose a tenant and user (x-dev-tenant-id, x-dev-user-id).");
+export async function resolveCaller(req: FastifyRequest, deps: Pick<RouteDeps, "auth" | "devAuth" | "webOrigin">): Promise<Caller> {
   const ua = req.headers["user-agent"];
-  return {
-    tenantId,
-    userId,
-    actor: { type: "user", id: `user:${userId}`, userId },
-    correlationId: (req as FastifyRequest & { correlationId: string }).correlationId,
-    source: "api",
+  const base = {
+    correlationId: req.correlationId,
     requestId: req.id,
     ipAddress: req.ip,
     ...(typeof ua === "string" ? { userAgent: ua.slice(0, 1000) } : {}),
   };
+  const token = readCookie(req, SESSION_COOKIE);
+  if (token) {
+    const session = await deps.auth.resolveSession(token);
+    if (!session) throw unauthenticated("Your session has ended. Sign in again.");
+    assertCsrf(req, deps.webOrigin);
+    return {
+      session,
+      ctx: { ...base, tenantId: session.tenantId, userId: session.userId, actor: { type: "user", id: `user:${session.userId}`, userId: session.userId }, source: "web" },
+    };
+  }
+  if (!deps.devAuth) throw unauthenticated();
+  const tenantId = req.headers["x-dev-tenant-id"];
+  const userId = req.headers["x-dev-user-id"];
+  if (!isUuid(tenantId) || !isUuid(userId)) throw unauthenticated("Sign in, or choose a developer identity (x-dev-tenant-id, x-dev-user-id).");
+  return { session: null, ctx: { ...base, tenantId, userId, actor: { type: "user", id: `user:${userId}`, userId }, source: "api" } };
 }
 
 export function tenantRoute(app: FastifyInstance, deps: RouteDeps, spec: TenantRouteSpec): void {
@@ -110,7 +130,11 @@ export function tenantRoute(app: FastifyInstance, deps: RouteDeps, spec: TenantR
     url: spec.url,
     ...(spec.schema ? { schema: spec.schema } : {}),
     handler: async (req: FastifyRequest, reply: FastifyReply) => {
-      const ctx = requestContext(req, deps.devAuth);
+      const { ctx, session } = await resolveCaller(req, deps);
+      // SEC-05: a privileged user without MFA may only see who they are until they enrol.
+      if (session?.mfaEnrollmentRequired && !membershipOnly) {
+        throw new ApiError(403, "MFA_ENROLLMENT_REQUIRED", "Set up an authenticator app before continuing (Account page).");
+      }
       const asOf = businessDateInDhaka(new Date());
       try {
         const result = await withTenant(deps.appPool, ctx, async (tx) => {

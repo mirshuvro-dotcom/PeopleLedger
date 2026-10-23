@@ -1,7 +1,8 @@
 import type pg from "pg";
 import { auditDiff, writeAudit } from "./audit.js";
 import { withPlatform, type PlatformContext, type TenantTx } from "./context.js";
-import { StaleVersionError } from "./errors.js";
+import { createHash, randomBytes } from "node:crypto";
+import { DbRuleError, StaleVersionError } from "./errors.js";
 
 /**
  * Platform-owned writes (ARCH-04): tenant, legal_entity, membership, role,
@@ -49,6 +50,13 @@ export async function changeMembershipStatus(
     [input.status, input.membershipId, input.expectedVersion],
   );
   if (r.rowCount !== 1) throw new StaleVersionError("membership", input.membershipId);
+  // RBAC-17: losing access ends the user's sessions in this tenant at once.
+  let sessionsRevoked = 0;
+  if (input.status === "suspended" || input.status === "revoked") {
+    const m = await tx.query<{ user_id: string }>("SELECT user_id FROM membership WHERE id = $1", [input.membershipId]);
+    const s = await tx.query<{ n: number }>("SELECT auth_revoke_member_sessions($1, $2) AS n", [m.rows[0]!.user_id, `membership ${input.status}`]);
+    sessionsRevoked = s.rows[0]?.n ?? 0;
+  }
   await writeAudit(tx, {
     category: "security",
     action: "membership.status_changed",
@@ -56,9 +64,31 @@ export async function changeMembershipStatus(
     resourceId: input.membershipId,
     reason: input.reason,
     before: { status: before.rows[0]?.status ?? null },
-    after: { status: input.status },
+    after: { status: input.status, sessionsRevoked },
   });
   return r.rows[0]!.version;
+}
+
+/**
+ * One-time access link for a member (IAM-01 account recovery / invitation
+ * acceptance): `initial-password` for an invited member, `password-reset` for an
+ * active one. Returns the raw token once; only its hash is stored. Delivered by
+ * the administrator until email exists (COM-01).
+ */
+export async function issueAccessLink(tx: TenantTx, membershipId: string, ttlHours = 72): Promise<{ token: string; purpose: string; expiresAt: Date }> {
+  const m = await tx.query<{ status: string }>("SELECT status FROM membership WHERE id = $1", [membershipId]);
+  const status = m.rows[0]?.status;
+  if (status !== "invited" && status !== "active") throw new DbRuleError("REFERENCE_NOT_FOUND", "Membership not found or not eligible for an access link.");
+  const purpose = status === "invited" ? "initial-password" : "password-reset";
+  const token = randomBytes(32).toString("base64url");
+  const r = await tx.query<{ expires: Date }>("SELECT auth_issue_setup_token($1, $2, $3, $4) AS expires", [
+    membershipId,
+    createHash("sha256").update(token).digest("hex"),
+    purpose,
+    ttlHours,
+  ]);
+  await writeAudit(tx, { category: "security", action: "membership.access_link_issued", resourceType: "membership", resourceId: membershipId, after: { purpose, expiresAt: r.rows[0]!.expires } });
+  return { token, purpose, expiresAt: r.rows[0]!.expires };
 }
 
 export async function createRole(tx: TenantTx, input: { name: string; description?: string; permissions: readonly string[] }): Promise<string> {

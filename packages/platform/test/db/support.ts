@@ -19,6 +19,7 @@ export interface TestDb {
   readonly app: pg.Pool;
   readonly worker: pg.Pool;
   readonly platform: pg.Pool;
+  readonly auth: pg.Pool;
   close(): Promise<void>;
 }
 
@@ -40,8 +41,9 @@ export async function createDatabase(options: { migrate?: boolean; appPoolSize?:
     app: pool(LOGINS.app, options.appPoolSize ?? 5),
     worker: pool(LOGINS.worker, 5),
     platform: pool(LOGINS.platform, 2),
+    auth: pool(LOGINS.auth, 5),
     async close() {
-      await Promise.all([db.app.end(), db.worker.end(), db.platform.end()]);
+      await Promise.all([db.app.end(), db.worker.end(), db.platform.end(), db.auth.end()]);
       await admin.end();
       const s = new pg.Client({ connectionString: ADMIN_URL });
       await s.connect();

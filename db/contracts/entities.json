@@ -14,7 +14,8 @@
     "audit-trail": "Per audit category within legal minimums, with legal hold (AUD-07). Period: not yet decided.",
     "operational-transient": "Delivery/processing bookkeeping; purge after completion window. Period: not yet decided.",
     "product-catalogue": "Product-versioned reference data; kept while referenced.",
-    "schema-metadata": "Kept for the life of the database."
+    "schema-metadata": "Kept for the life of the database.",
+    "authentication": "Credentials, MFA secrets and sessions: kept while the account exists; sessions and challenges purged after expiry plus a security review window. Period: not yet decided."
   },
   "entities": [
     {
@@ -1401,6 +1402,562 @@
           "classification": "public",
           "api": null,
           "description": "Database role that applied it."
+        }
+      }
+    },
+    {
+      "table": "user_credential",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Password credential per user account (IAM-01). scrypt hash only; lockout counters (NFR-02).",
+      "retentionClass": "authentication",
+      "apiResource": null,
+      "writePath": "AuthService (pl_auth role) only.",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (user_id)",
+        "FK user_id -> user_account",
+        "password_hash starts with scrypt$",
+        "failed_attempts >= 0",
+        "only pl_auth has grants"
+      ],
+      "columns": {
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Account."
+        },
+        "password_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "scrypt$N$r$p$salt$hash. Never exposed."
+        },
+        "password_changed_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "passwordChangedAt",
+          "description": "When the password last changed."
+        },
+        "failed_attempts": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Consecutive failures since last success."
+        },
+        "locked_until": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Temporary lockout end."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "DB clock at creation."
+        }
+      }
+    },
+    {
+      "table": "user_totp",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "TOTP authenticator per user (IAM-01). Secret encrypted with AES-256-GCM; replay blocked via last_used_step.",
+      "retentionClass": "authentication",
+      "apiResource": null,
+      "writePath": "AuthService only.",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (user_id)",
+        "FK user_id -> user_account",
+        "secret_ciphertext starts with v1:",
+        "only pl_auth has grants"
+      ],
+      "columns": {
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Account."
+        },
+        "secret_ciphertext": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Encrypted base32 secret (context-bound to the user)."
+        },
+        "confirmed_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": "mfaEnabledAt",
+          "description": "Set when enrolment is confirmed with a code; null = pending."
+        },
+        "last_used_step": {
+          "type": "bigint",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Last accepted 30-second step."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "When this secret was generated."
+        }
+      }
+    },
+    {
+      "table": "user_recovery_code",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "association",
+      "description": "Single-use MFA recovery codes, stored as sha256.",
+      "retentionClass": "authentication",
+      "apiResource": null,
+      "writePath": "AuthService only.",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (user_id, code_hash)",
+        "FK user_id -> user_account",
+        "code_hash is 64 hex chars"
+      ],
+      "columns": {
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Account."
+        },
+        "code_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "sha256 of the normalized code."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Issued."
+        },
+        "used_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Consumed; null = unused."
+        }
+      }
+    },
+    {
+      "table": "auth_challenge",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "infrastructure",
+      "description": "A password-verified sign-in awaiting MFA and/or tenant choice. Short-lived, attempt-limited.",
+      "retentionClass": "authentication",
+      "apiResource": null,
+      "writePath": "AuthService only.",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (id)",
+        "unique token_hash (sha256)",
+        "expires_at > created_at",
+        "attempts >= 0"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Challenge id."
+        },
+        "token_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "sha256 of the challenge cookie."
+        },
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Account."
+        },
+        "mfa_required": {
+          "type": "boolean",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "A second factor is required."
+        },
+        "mfa_verified_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Second factor accepted."
+        },
+        "attempts": {
+          "type": "integer",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Failed second-factor attempts."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Created."
+        },
+        "expires_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Expiry."
+        },
+        "consumed_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Turned into a session."
+        }
+      }
+    },
+    {
+      "table": "auth_session",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "aggregate-root",
+      "description": "Signed-in session for one user in one tenant (IAM-04, IAM-05). Cookie token stored as sha256; idle and absolute expiry.",
+      "retentionClass": "authentication",
+      "apiResource": "/auth/sessions",
+      "writePath": "AuthService; auth_revoke_member_sessions() on suspension (RBAC-17).",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (id)",
+        "unique token_hash",
+        "FK (tenant_id, user_id) -> membership: only members can hold a session",
+        "revoked_at and revoked_reason set together",
+        "absolute_expires_at > created_at"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": "id",
+          "description": "Session id."
+        },
+        "token_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "sha256 of the session cookie."
+        },
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Account."
+        },
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Tenant the session is bound to."
+        },
+        "mfa_verified": {
+          "type": "boolean",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "mfaVerified",
+          "description": "Second factor proved in this session."
+        },
+        "mfa_enrollment_required": {
+          "type": "boolean",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "mfaEnrollmentRequired",
+          "description": "Privileged user without MFA: only enrolment is allowed (SEC-05)."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "employee",
+          "api": "createdAt",
+          "description": "Signed in at."
+        },
+        "last_seen_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "employee",
+          "api": "lastSeenAt",
+          "description": "Last activity."
+        },
+        "idle_expires_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Idle expiry."
+        },
+        "absolute_expires_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Absolute expiry."
+        },
+        "revoked_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "employee",
+          "api": "revokedAt",
+          "description": "Ended at."
+        },
+        "revoked_reason": {
+          "type": "text",
+          "nullable": true,
+          "classification": "employee",
+          "api": "revokedReason",
+          "description": "Why it ended."
+        },
+        "ip_address": {
+          "type": "inet",
+          "nullable": true,
+          "classification": "employee",
+          "api": "ipAddress",
+          "description": "Client IP at sign-in."
+        },
+        "user_agent": {
+          "type": "text",
+          "nullable": true,
+          "classification": "employee",
+          "api": "userAgent",
+          "description": "Browser at sign-in."
+        }
+      }
+    },
+    {
+      "table": "auth_setup_token",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "infrastructure",
+      "description": "One-time link to set or reset a password (IAM-01 account recovery, invitation acceptance). Only the newest per user and tenant is usable.",
+      "retentionClass": "authentication",
+      "apiResource": "/v1/members/{id}/access-link",
+      "writePath": "auth_issue_setup_token() from a tenant administrator; redeemed by AuthService.",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (id)",
+        "unique token_hash",
+        "FK (tenant_id, membership_id) -> membership",
+        "purpose in (initial-password, password-reset)",
+        "expires_at > created_at",
+        "cannot be issued by the user for themself"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Link id."
+        },
+        "token_hash": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "sha256 of the link token."
+        },
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Issuing tenant."
+        },
+        "membership_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Membership the link is for."
+        },
+        "user_id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "public",
+          "api": null,
+          "description": "Account."
+        },
+        "purpose": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "purpose",
+          "description": "initial-password or password-reset."
+        },
+        "created_by": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Issuing actor."
+        },
+        "created_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Issued."
+        },
+        "expires_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": "expiresAt",
+          "description": "Expiry."
+        },
+        "used_at": {
+          "type": "timestamp with time zone",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Redeemed or superseded."
+        }
+      }
+    },
+    {
+      "table": "auth_event",
+      "owner": "platform",
+      "tenantScoped": false,
+      "runtimeAccess": true,
+      "kind": "append-only-log",
+      "description": "Authentication events (AUD-01): logins, failures, lockouts, MFA, sessions, password changes. Append-only for every role. Tenant-relevant events are also written to that tenant's audit_event.",
+      "retentionClass": "audit-trail",
+      "apiResource": null,
+      "writePath": "AuthService only.",
+      "migration": "Created in 0005_auth (expand).",
+      "constraints": [
+        "PK (id)",
+        "event and result from fixed lists",
+        "UPDATE, DELETE and TRUNCATE rejected for every role",
+        "no email or password ever stored"
+      ],
+      "columns": {
+        "id": {
+          "type": "uuid",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Event id."
+        },
+        "occurred_at": {
+          "type": "timestamp with time zone",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "When."
+        },
+        "event": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Event name."
+        },
+        "result": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "success, failed or denied."
+        },
+        "user_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Account when known."
+        },
+        "tenant_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Tenant when known."
+        },
+        "session_id": {
+          "type": "uuid",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Session when relevant."
+        },
+        "reason": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Short reason."
+        },
+        "ip_address": {
+          "type": "inet",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Client IP."
+        },
+        "user_agent": {
+          "type": "text",
+          "nullable": true,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Client user agent."
+        },
+        "correlation_id": {
+          "type": "text",
+          "nullable": false,
+          "classification": "hr-restricted",
+          "api": null,
+          "description": "Request correlation id."
         }
       }
     }

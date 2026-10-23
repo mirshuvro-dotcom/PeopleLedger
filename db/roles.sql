@@ -7,6 +7,7 @@
 --   pl_app      request handling; subject to row-level security
 --   pl_worker   background jobs; member of pl_app plus outbox claim rights
 --   pl_platform platform operations (tenant provisioning); no tenant data access
+--   pl_auth     authentication service (credentials, sessions); no tenant data access
 --
 -- None of these roles may own tables or hold BYPASSRLS.
 DO $$
@@ -19,6 +20,9 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pl_platform') THEN
     CREATE ROLE pl_platform NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+  END IF;
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'pl_auth') THEN
+    CREATE ROLE pl_auth NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
   END IF;
   IF NOT EXISTS (
     SELECT FROM pg_auth_members m

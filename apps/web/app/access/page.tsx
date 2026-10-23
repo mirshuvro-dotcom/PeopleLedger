@@ -53,6 +53,7 @@ export default function AccessPage() {
   const roleAction = useAction();
   const assignAction = useAction();
   const [email, setEmail] = useState("");
+  const [link, setLink] = useState<{ email: string; url: string; purpose: string; expiresAt: string } | null>(null);
   const [roleName, setRoleName] = useState("");
   const [rolePerms, setRolePerms] = useState<string[]>([]);
   const [assign, setAssign] = useState({ membershipId: "", roleId: "", scopeType: "tenant", legalEntityId: "", effectiveFrom: todayInDhaka(), reason: "" });
@@ -76,6 +77,7 @@ export default function AccessPage() {
                   <th>Status</th>
                   <th className="num">Version</th>
                   <th>Change status</th>
+                  <th>Password link</th>
                 </tr>
               </thead>
               <tbody>
@@ -102,6 +104,21 @@ export default function AccessPage() {
                         ))}
                       </div>
                     </td>
+                    <td>
+                      {m.status === "invited" || m.status === "active" ? (
+                        <button
+                          className="secondary"
+                          disabled={memberAction.busy}
+                          onClick={() =>
+                            void memberAction.post<{ path: string; purpose: string; expiresAt: string }>(`/v1/members/${m.id}/access-link`, {}, "Link created. Copy it now; it is shown only once.", (r) =>
+                              setLink({ email: m.email, url: `${window.location.origin}${r.path}`, purpose: r.purpose, expiresAt: r.expiresAt }),
+                            )
+                          }
+                        >
+                          {m.status === "invited" ? "Setup link" : "Reset link"}
+                        </button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -125,6 +142,13 @@ export default function AccessPage() {
           <button disabled={memberAction.busy}>Invite</button>
         </form>
         <ActionStatus action={memberAction} />
+        {link ? (
+          <div className="notice" style={{ marginTop: 10 }}>
+            <strong>{link.purpose === "initial-password" ? "Setup" : "Password reset"} link for {link.email}</strong> (single use, expires {new Date(link.expiresAt).toLocaleString("en-GB", { timeZone: "Asia/Dhaka" })} BDT).
+            Send it to them through a trusted channel; email delivery comes later.
+            <div className="secret" style={{ marginTop: 6 }}>{link.url}</div>
+          </div>
+        ) : null}
       </Card>
 
       <Card title="Roles">

@@ -43,3 +43,7 @@ export function assertTenant<T extends TenantScoped>(context: TenantId, record: 
 }
 
 export * from "./db/index.js";
+export * from "./auth/crypto.js";
+export * from "./auth/password.js";
+export * from "./auth/totp.js";
+export * from "./auth/service.js";

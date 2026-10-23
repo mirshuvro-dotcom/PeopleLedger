@@ -1,15 +1,17 @@
 import "../../../scripts/load-env.js";
-import { createPool } from "@peopleledger/platform";
+import { AuthService, createPool } from "@peopleledger/platform";
 import { loadConfig } from "./config.js";
 import { buildServer } from "./server.js";
 
 const config = loadConfig();
 const appPool = createPool(config.appDbUrl, { environment: config.environment, applicationName: "peopleledger-api" });
-const app = buildServer({ config, appPool });
+const authPool = createPool(config.authDbUrl, { environment: config.environment, applicationName: "peopleledger-api-auth" });
+const auth = new AuthService({ authPool, appPool, dataKey: config.dataKey });
+const app = buildServer({ config, appPool, auth });
 
 const shutdown = async () => {
   await app.close();
-  await appPool.end();
+  await Promise.all([appPool.end(), authPool.end()]);
   process.exit(0);
 };
 process.on("SIGINT", shutdown);

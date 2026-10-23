@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 import Fastify, { type FastifyInstance } from "fastify";
 import type pg from "pg";
+import type { AuthService } from "@peopleledger/platform";
 import type { ApiConfig } from "./config.js";
 import { toHttpError } from "./errors.js";
 import { accessRoutes } from "./routes/access.js";
+import { authRoutes } from "./routes/auth.js";
 import { auditRoutes } from "./routes/audit.js";
 import { devRoutes } from "./routes/dev.js";
 import { organizationRoutes } from "./routes/organization.js";
@@ -11,8 +13,9 @@ import { peopleRoutes } from "./routes/people.js";
 import { correlationIdOf, type RegisteredRoute } from "./tenant-route.js";
 
 export interface ServerDeps {
-  readonly config: Pick<ApiConfig, "devAuth" | "repoRoot" | "environment">;
+  readonly config: Pick<ApiConfig, "devAuth" | "repoRoot" | "environment" | "webOrigin">;
   readonly appPool: pg.Pool;
+  readonly auth: AuthService;
   readonly logger?: boolean;
 }
 
@@ -57,7 +60,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance & { tenantRoutes:
     return { status: "ok", database: r.rows[0]?.ok === 1 ? "ok" : "unknown", environment: deps.config.environment, devAuth: deps.config.devAuth };
   });
 
-  const routeDeps = { appPool: deps.appPool, devAuth: deps.config.devAuth, routes };
+  const routeDeps = { appPool: deps.appPool, auth: deps.auth, devAuth: deps.config.devAuth, webOrigin: deps.config.webOrigin, routes };
+  authRoutes(app, { auth: deps.auth, webOrigin: deps.config.webOrigin, secureCookies: deps.config.environment === "production" });
   organizationRoutes(app, routeDeps);
   accessRoutes(app, routeDeps);
   peopleRoutes(app, routeDeps);

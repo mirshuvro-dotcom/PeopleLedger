@@ -15,7 +15,7 @@ export default async function setup(): Promise<void> {
   }
   try {
     await client.query(readFileSync(new URL("../../../../db/roles.sql", import.meta.url), "utf8"));
-    const grants: Record<string, string> = { [LOGINS.app]: "pl_app", [LOGINS.worker]: "pl_worker", [LOGINS.platform]: "pl_platform" };
+    const grants: Record<string, string> = { [LOGINS.app]: "pl_app", [LOGINS.worker]: "pl_worker", [LOGINS.platform]: "pl_platform", [LOGINS.auth]: "pl_auth" };
     for (const [login, role] of Object.entries(grants)) {
       const exists = await client.query("SELECT 1 FROM pg_roles WHERE rolname = $1", [login]);
       const pw = client.escapeLiteral(TEST_ROLE_PASSWORD);

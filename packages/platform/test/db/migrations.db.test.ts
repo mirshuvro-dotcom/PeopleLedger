@@ -10,7 +10,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import pg from "pg";
 import { afterEach, describe, expect, it } from "vitest";
-import { appliedMigrations, createLegalEntity, DEFAULT_MIGRATIONS_DIR, loadMigrations, migrateDown, migrateUp, withTenant } from "../../src/index.js";
+import { appliedMigrations, createLegalEntity, DEFAULT_MIGRATIONS_DIR, loadDataContracts, loadMigrations, migrateDown, migrateUp, withTenant } from "../../src/index.js";
+
+/** Every table the migrations create, per the data contract (GOV-03). */
+const TABLES = loadDataContracts().entities.length;
+const VERSIONS = loadMigrations().map((m) => m.version);
+const LATEST = VERSIONS[VERSIONS.length - 1]!;
 import { urlFor } from "./env.js";
 import { createDatabase, seedTenant, userCtx, type TestDb } from "./support.js";
 
@@ -45,7 +50,7 @@ describe("empty database", () => {
     const versions = loadMigrations().map((m) => m.version);
     expect(await migrateUp(db.admin)).toEqual(versions);
     expect(await migrateUp(db.admin)).toEqual([]);
-    expect((await publicTables(db)).length).toBe(17);
+    expect((await publicTables(db)).length).toBe(TABLES);
 
     expect(await migrateDown(db.admin, { steps: versions.length, allowDestructive: true })).toEqual([...versions].reverse());
     expect(await publicTables(db)).toEqual(["schema_migrations"]);
@@ -70,9 +75,9 @@ describe("seeded database", () => {
     const t = await seedTenant(db, "Seeded");
     await withTenant(db.app, userCtx(t.tenantId), (tx) => createLegalEntity(tx, { legalNameEn: "Second Seeded Ltd" }));
 
-    expect(await migrateDown(db.admin, { steps: 1, allowDestructive: true })).toEqual(["0004"]);
-    expect(await publicTables(db)).not.toContain("outbox_event");
-    expect(await migrateUp(db.admin)).toEqual(["0004"]);
+    expect(await migrateDown(db.admin, { steps: 1, allowDestructive: true })).toEqual([LATEST]);
+    expect(await publicTables(db)).not.toContain("auth_session");
+    expect(await migrateUp(db.admin)).toEqual([LATEST]);
 
     const r = await db.admin.query("SELECT 1 FROM legal_entity WHERE tenant_id = $1", [t.tenantId]);
     expect(r.rowCount).toBe(2);
@@ -84,9 +89,9 @@ describe("seeded database", () => {
     const db = await emptyDb();
     await migrateUp(db.admin);
     await seedTenant(db, "Doomed");
-    await expect(migrateDown(db.admin, { steps: 4, allowDestructive: false })).rejects.toThrow(/allowDestructive/);
-    expect((await publicTables(db)).length).toBe(17);
-    await migrateDown(db.admin, { steps: 4, allowDestructive: true });
+    await expect(migrateDown(db.admin, { steps: VERSIONS.length, allowDestructive: false })).rejects.toThrow(/allowDestructive/);
+    expect((await publicTables(db)).length).toBe(TABLES);
+    await migrateDown(db.admin, { steps: VERSIONS.length, allowDestructive: true });
     expect(await publicTables(db)).toEqual(["schema_migrations"]);
     await migrateUp(db.admin);
     expect((await db.admin.query("SELECT 1 FROM tenant")).rowCount).toBe(0);
@@ -127,7 +132,7 @@ describe("safety rails", () => {
     await expect(migrateUp(db.admin, { dir })).rejects.toThrow(/0097_broken failed/);
     expect(await publicTables(db)).not.toContain("half_done");
     // Earlier migrations committed; only the broken one is absent.
-    expect((await appliedMigrations(db.admin)).map((m) => m.version)).toEqual(["0001", "0002", "0003", "0004"]);
+    expect((await appliedMigrations(db.admin)).map((m) => m.version)).toEqual(VERSIONS);
   });
 
   it("concurrent runners apply each migration once", async () => {

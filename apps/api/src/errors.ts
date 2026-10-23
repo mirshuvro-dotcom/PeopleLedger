@@ -1,4 +1,4 @@
-import { DbRuleError } from "@peopleledger/platform";
+import { AuthError, DbRuleError } from "@peopleledger/platform";
 
 /** Stable API error codes (Section 19 item 4). Messages never echo other tenants' data. */
 export class ApiError extends Error {
@@ -29,13 +29,31 @@ const STATUS: Record<string, [number, string?]> = {
 };
 
 export interface ErrorBody {
-  readonly error: { readonly code: string; readonly message: string; readonly correlationId: string };
+  readonly error: { readonly code: string; readonly message: string; readonly correlationId: string; readonly details?: readonly string[] };
 }
+
+const AUTH_STATUS: Record<string, number> = {
+  INVALID_CREDENTIALS: 401,
+  CHALLENGE_INVALID: 401,
+  MFA_INVALID: 401,
+  MFA_REQUIRED: 401,
+  NOT_A_MEMBER: 403,
+  PASSWORD_POLICY: 422,
+  TOKEN_INVALID: 400,
+  MFA_ALREADY_ENABLED: 409,
+  MFA_NOT_PENDING: 409,
+};
 
 /** Map any thrown error to an HTTP status and safe body. Unknown errors become 500 without details. */
 export function toHttpError(error: unknown, correlationId: string): { status: number; body: ErrorBody } {
   if (error instanceof ApiError) {
     return { status: error.status, body: { error: { code: error.code, message: error.message, correlationId } } };
+  }
+  if (error instanceof AuthError) {
+    return {
+      status: AUTH_STATUS[error.code] ?? 400,
+      body: { error: { code: error.code, message: error.message, correlationId, ...(error.details.length ? { details: error.details } : {}) } },
+    };
   }
   if (error instanceof DbRuleError && error.code in STATUS) {
     const [status, safeMessage] = STATUS[error.code]!;
