@@ -7,8 +7,10 @@
  *   pnpm db up [--allow-contract]                 apply pending migrations
  *   pnpm db down --steps N --allow-destructive    revert N migrations (refused when PEOPLELEDGER_ENV=production)
  *
- * Connection: PEOPLELEDGER_DB_MIGRATION_URL (the schema-owner role, not a runtime role).
+ * Connection: PEOPLELEDGER_DB_MIGRATION_URL (the schema-owner role, not a runtime role), from the
+ * environment or the local .env file (see .env.example).
  */
+import "./load-env.js";
 import { readFileSync } from "node:fs";
 import pg from "pg";
 import { appliedMigrations, assertConnectionPolicy, loadMigrations, migrateDown, migrateUp, type DbEnvironment } from "@peopleledger/platform";

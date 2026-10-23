@@ -1,8 +1,10 @@
+import "./scripts/load-env.js";
 import { defineConfig } from "vitest/config";
 
 /**
  * Database tests need PostgreSQL 16+ reachable at PEOPLELEDGER_DB_ADMIN_URL
- * (default postgres://postgres:postgres@localhost:5432/postgres). Each test
+ * (default postgres://postgres:postgres@localhost:5432/postgres), set in the
+ * environment or the local .env file (see .env.example). Each test
  * file gets its own freshly migrated database.
  */
 export default defineConfig({

@@ -39,7 +39,8 @@ pnpm traceability     # regenerate the requirement matrix (fails if a Passed row
 pnpm data-contracts   # regenerate docs/data-contracts from db/contracts/entities.json
 ```
 
-Database tests connect with `PEOPLELEDGER_DB_ADMIN_URL` (default `postgres://postgres:postgres@localhost:5432/postgres`,
+Local settings can live in a git-ignored `.env` file: copy `.env.example` to `.env` and fill in your PostgreSQL
+password. Database tests connect with `PEOPLELEDGER_DB_ADMIN_URL` (default `postgres://postgres:postgres@localhost:5432/postgres`,
 a superuser on a disposable cluster). They create the cluster roles and synthetic login users themselves.
 
 ### Running migrations
