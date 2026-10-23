@@ -399,7 +399,7 @@ Benchmark data must include realistic history, indexes, file/report load and ten
 
 ## 17 Development phases and release gates
 
-Durations are planning ranges for a small experienced team (about 6 to 9 engineers, one designer, one QA lead, a payroll product owner) with Bangladesh tax practitioner and labour lawyer hours contracted. AI coding assistance does not remove design, review, QA or legal review dependencies. The original v1 table implied 23 to 37 weeks. Phases 0 to 4 below sum to 34 to 48 weeks if run strictly one after another, and the R0 scope in Appendix F (about 294 of 360 requirements, including split-scope items) is large for a team of this size. Plan 11 to 15 months to the first live payroll and re-estimate in Phase 0, because payroll validation is calendar bound (parallel monthly cycles cannot be compressed) and legal review has external lead times. Reaching R1 (Phase 6) takes additional time. Estimate again after Phase 0; overlap work only after its contracts are stable.
+Durations are planning ranges for a small experienced team (about 6 to 9 engineers, one designer, one QA lead, a payroll product owner) with Bangladesh tax practitioner and labour lawyer hours contracted. AI coding assistance does not remove design, review, QA or legal review dependencies. The original v1 table implied 23 to 37 weeks. Phases 0 to 4 below sum to 34 to 48 weeks if run strictly one after another, and the R0 scope in Appendix F (294 of 361 requirements, counting split-scope items by their first release) is large for a team of this size. Plan 11 to 15 months to the first live payroll and re-estimate in Phase 0, because payroll validation is calendar bound (parallel monthly cycles cannot be compressed) and legal review has external lead times. Reaching R1 (Phase 6) takes additional time. Estimate again after Phase 0; overlap work only after its contracts are stable.
 
 | Phase | Planning range | Deliverables | Exit gate |
 |---|---|---|---|
@@ -483,7 +483,7 @@ A feature is done only when its requirement IDs are implemented, permissions enf
 ### 19.2 Reusable implementation prompt
 
 ```text
-Implement only [requirement IDs / feature] from PeopleLedger_Product_Requirements_v3.md.
+Implement only [requirement IDs / feature] from PeopleLedger_Product_Requirements_v3.1_Final.md.
 Read the repository instructions, architecture decisions and relevant module contracts first.
 State the data changes, authorization rules, financial/legal invariants and acceptance checks.
 Use approved legal packs only; do not infer or invent statutory parameters.
@@ -1034,7 +1034,7 @@ V3 retains all 325 individually numbered v2 requirements and all eight PRN princ
 
 ### E.1a Changes in v3.1 (final baseline)
 
-- Section 17: corrected two garbled sentences, removed stale "v2" wording, and replaced the 9 to 14 month pilot estimate with 11 to 15 months to first live payroll after reviewing the R0 scope (Appendix F: 294 of 360 requirements carry an R0 component).
+- Section 17: corrected two garbled sentences, removed stale "v2" wording, and replaced the 9 to 14 month pilot estimate with 11 to 15 months to first live payroll after reviewing the R0 scope (Appendix F: 294 of 361 requirements are assigned R0 in the matrix).
 - Appendix F: nine convenience capabilities moved from R0 to R1 (see F.1). Interim controls are stated so that no obligation is left uncovered.
 - Appendix B and C unchanged: all tax and labour parameters remain unverified (U) and the 27 open legal items remain blocking for activation. v3.1 adds no new legal facts.
 - Remaining open decisions are owned in Phase 0: cohort confirmation, pilot customers, practitioner and counsel contracting, hosting and data protection, pricing.

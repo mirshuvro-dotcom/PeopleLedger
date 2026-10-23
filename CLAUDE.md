@@ -1,7 +1,7 @@
 # Repository instructions
 
 These apply to every contributor, including AI assistants. They condense Section 19 of
-`docs/requirements/PeopleLedger_Product_Requirements_v3.1.md`; the document wins on conflict.
+`docs/requirements/PeopleLedger_Product_Requirements_v3.1_Final.md`; the document wins on conflict.
 
 ## Before changing code
 

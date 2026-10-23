@@ -3,12 +3,12 @@
 Found while analysing the v3.1 baseline. None of these block the current software work; each blocks a later gate
 until answered.
 
-## Spec consistency
+## Spec consistency (resolved)
 
-1. **Requirement count.** Section 17 and Appendix E say 360 requirements. Appendix F lists **361** unique IDs
-   (R0 294, R1 59, R2 8; the R0 count matches the text). Which is intended? `scripts/generate-traceability.ts`
-   parses whatever Appendix F contains.
-2. **Section 19.2 prompt** still references `PeopleLedger_Product_Requirements_v3.md`. Should it point to v3.1?
+1. ~~Requirement count 360 vs 361.~~ Resolved in the updated v3.1 Final baseline: Section 17 and Appendix E.1a now
+   say 294 of 361 requirements are R0, matching Appendix F.
+2. ~~Section 19.2 prompt referenced the v3 file.~~ Resolved: it now names
+   `PeopleLedger_Product_Requirements_v3.1_Final.md`, which is the file name used in `docs/requirements/`.
 
 ## Decisions owed in Phase 0 (Section 20, Appendix D)
 

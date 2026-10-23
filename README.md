@@ -2,7 +2,7 @@
 
 Bangladesh-first, multi-tenant HR, payroll and employee income tax SaaS.
 
-The product baseline is [docs/requirements/PeopleLedger_Product_Requirements_v3.1.md](docs/requirements/PeopleLedger_Product_Requirements_v3.1.md).
+The product baseline is [docs/requirements/PeopleLedger_Product_Requirements_v3.1_Final.md](docs/requirements/PeopleLedger_Product_Requirements_v3.1_Final.md).
 Requirement IDs (e.g. `TAX-09`, `LAW-04`) from that document appear in code comments, tests and the
 [traceability matrix](docs/traceability/requirements-matrix.md).
 
