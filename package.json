@@ -1,0 +1,27 @@
+{
+  "name": "peopleledger",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PeopleLedger: Bangladesh-first multi-tenant HR, payroll and tax SaaS (modular monolith)",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test",
+    "demo:slice": "tsx scripts/vertical-slice.ts",
+    "traceability": "tsx scripts/generate-traceability.ts"
+  },
+  "devDependencies": {
+    "@peopleledger/contracts": "workspace:*",
+    "@peopleledger/pay": "workspace:*",
+    "@peopleledger/people": "workspace:*",
+    "@peopleledger/platform": "workspace:*",
+    "@types/node": "22.20.5",
+    "tsx": "4.20.6",
+    "typescript": "5.9.3",
+    "vitest": "3.2.4"
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "packId": "BD-INCOME-TAX-SALARY",
+  "version": "FA2026-draft-1",
+  "jurisdiction": "BD",
+  "legalRegime": "BD-PRIVATE-SECTOR-RESIDENT-SALARIED",
+  "topic": "salary-income-tax-withholding",
+  "title": "TEST ONLY - Appendix B inherited seed candidates (unverified, quarantined development reference)",
+  "incomeYear": { "start": "2026-07-01", "end": "2027-06-30" },
+  "assessmentYearLabel": {
+    "value": null,
+    "evidence": { "grade": "U", "note": "Sources disagree on FY vs assessment-year labelling." },
+    "openItems": ["L-25"]
+  },
+  "effectiveFrom": "2026-07-01",
+  "status": "draft",
+  "testOnly": true,
+  "engineCompatibility": ["1"],
+  "supportedScope": { "residency": ["resident"], "payFrequency": ["monthly"], "currency": ["BDT"] },
+  "author": "spec-appendix-b-import",
+  "parameters": {
+    "taxFreeThresholds": {
+      "value": {
+        "general": "400000",
+        "woman": "450000",
+        "age-65-or-over": "450000",
+        "person-with-disability": "525000",
+        "third-gender": "525000",
+        "gazetted-war-wounded-freedom-fighter": "550000",
+        "july-warrior": "550000"
+      },
+      "evidence": { "grade": "U", "note": "Appendix B.2, inherited from secondary summaries of the Finance Act 2026; no parameter-level citation." },
+      "openItems": ["L-27"]
+    },
+    "categoryPrecedence": {
+      "value": null,
+      "evidence": { "grade": "U", "note": "Appendix B.2: not stated by sources; practitioner rule required, never add." },
+      "openItems": ["L-27"]
+    },
+    "slabs": {
+      "value": [
+        { "width": "300000", "rate": "0.10" },
+        { "width": "400000", "rate": "0.15" },
+        { "width": "500000", "rate": "0.20" },
+        { "width": "2000000", "rate": "0.25" },
+        { "width": null, "rate": "0.30" }
+      ],
+      "evidence": { "grade": "U", "note": "Appendix B.2 slab structure after the tax-free amount." },
+      "openItems": ["L-27"]
+    },
+    "salaryExemption": {
+      "value": { "fractionNumerator": 1, "fractionDenominator": 3, "cap": "500000" },
+      "evidence": { "grade": "U", "note": "Appendix B.2: lower of one third of employment income and Tk 500,000." },
+      "openItems": ["L-27"]
+    },
+    "withholdingMethod": {
+      "value": "average-rate-remaining-periods",
+      "evidence": { "grade": "U", "note": "Appendix B.3: Section 86 ITA 2023 with TDS Rules 2026, average rate method; re-verify against TDS Rules 2026." },
+      "openItems": ["L-27"]
+    },
+    "annualTaxRounding": {
+      "value": { "scale": 2, "mode": "HALF_UP" },
+      "evidence": { "grade": "U", "note": "Placeholder for test arithmetic only; legal rounding is unconfirmed." },
+      "openItems": ["L-26"]
+    },
+    "periodWithholdingRounding": {
+      "value": { "scale": 2, "mode": "HALF_UP" },
+      "evidence": { "grade": "U", "note": "Placeholder matching Appendix B.4 display (2,291.67); legal rounding is unconfirmed." },
+      "openItems": ["L-26"]
+    }
+  },
+  "approvals": []
+}

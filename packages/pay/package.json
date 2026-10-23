@@ -1,0 +1,13 @@
+{
+  "name": "@peopleledger/pay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@peopleledger/contracts": "workspace:*",
+    "decimal.js": "10.6.0"
+  }
+}
