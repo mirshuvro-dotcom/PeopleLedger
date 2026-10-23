@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import pg from "pg";
-import { ADMIN_URL, LOGINS, TEST_ROLE_PASSWORD } from "./env.js";
+import { ADMIN_URL, LOGINS, redactedAdminUrl, TEST_ROLE_PASSWORD } from "./env.js";
 
 /** Create cluster roles (db/roles.sql) and synthetic test login users once per run. */
 export default async function setup(): Promise<void> {
@@ -8,7 +8,10 @@ export default async function setup(): Promise<void> {
   try {
     await client.connect();
   } catch (error) {
-    throw new Error(`Database tests need PostgreSQL at PEOPLELEDGER_DB_ADMIN_URL (${ADMIN_URL}): ${(error as Error).message}`);
+    throw new Error(
+      `Database tests need PostgreSQL at PEOPLELEDGER_DB_ADMIN_URL (${redactedAdminUrl()}): ${(error as Error).message}. ` +
+        "Set it to postgres://postgres:<your postgres password>@localhost:5432/postgres (URL-encode special characters).",
+    );
   }
   try {
     await client.query(readFileSync(new URL("../../../../db/roles.sql", import.meta.url), "utf8"));

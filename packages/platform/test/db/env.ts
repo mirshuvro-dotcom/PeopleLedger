@@ -12,3 +12,14 @@ export function urlFor(database: string, user?: string): string {
   }
   return u.toString();
 }
+
+/** The admin URL with its password masked, safe to print in error messages. */
+export function redactedAdminUrl(): string {
+  try {
+    const u = new URL(ADMIN_URL);
+    if (u.password) u.password = "****";
+    return u.toString();
+  } catch {
+    return "(unparseable URL)";
+  }
+}
